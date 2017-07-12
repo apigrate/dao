@@ -1,0 +1,29 @@
+{
+  "name": "@apigrate/mysqlutils",
+  "version": "1.0.0",
+  "description": "Apigrate MySQL utilities and ORM tools.",
+  "main": "dbentity.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gaumeister/mysqlutils.git"
+  },
+  "keywords": [
+    "Mysql"
+  ],
+  "author": "Derek R. Gau",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/gaumeister/mysqlutils/issues"
+  },
+  "homepage": "https://github.com/gaumeister/mysqlutils#readme",
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "lodash": "^4.17.4",
+    "moment": "^2.18.1",
+    "mysql": "^2.13.0",
+    "winston": "^2.3.1"
+  }
+}
