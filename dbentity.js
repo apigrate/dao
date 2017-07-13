@@ -13,7 +13,8 @@ var winston = require('winston');
     plural: 'string (derived from English plural rules)',
     created_timestamp_column: 'created',
     updated_timestamp_column: 'updated',
-    version_number_column: 'version'
+    version_number_column: 'version',
+    log_category: 'db'
   }
   @param {object} pool required mysql db pool reference.
   @param {object} logger optional logger instance.
@@ -50,17 +51,19 @@ function DbEntity(table, entity, opts, pool, logger){
   this.options = (opts || {
     created_timestamp_column: 'created',
     updated_timestamp_column: 'updated',
-    version_number_column: 'version'
+    version_number_column: 'version',
+    log_category: 'db'
   });
 
   if(logger && logger.INFO){
     LOGGER = logger;
   } else {
     //wrapper for winston
+    LOGGER = winston.loggers.get(this.options.log_category);
     LOGGER = {
       ERROR: function(msg){winston.log("error", msg);},
-      WARN: function(msg){winston.log("warn", msg);},
-      INFO: function(msg){winston.log("info", msg);},
+      WARN:  function(msg){winston.log("warn", msg);},
+      INFO:  function(msg){winston.log("info", msg);},
       DEBUG: function(msg){winston.log("debug", msg);},
       TRACE: function(msg){winston.log("silly", msg);},
     };
