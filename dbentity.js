@@ -1,3 +1,4 @@
+//v 1.0.3
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
@@ -94,7 +95,7 @@ DbEntity.prototype.fetchMetadata = function(){
 
       self.callDb(sql, [])
       .then(function(results){
-        LOGGER.silly(self.entity +' fetchMetadata raw results:' + JSON.stringify(results,null,2));
+        LOGGER.silly(self.entity +' fetchMetadata raw results:' + JSON.stringify(results));
         //init the metadata object.
         self.metadata = [];
         _.each(results, function(item){
@@ -105,7 +106,10 @@ DbEntity.prototype.fetchMetadata = function(){
             pk: item.Key==='PRI',
             nullable: item.Null==='YES',
             default: item.Default,
-            autoincrement: item.Extra==='auto_increment'
+            autoincrement: item.Extra==='auto_increment',
+            is_updated_timestamp: false,
+            is_created_timestamp: false,
+            is_updated_version: false
           };
           c.is_updated_timestamp=!_.isNil(self.options.updated_timestamp_column)&&c.column===self.options.updated_timestamp_column;
           c.is_created_timestamp=!_.isNil(self.options.created_timestamp_column)&&c.column===self.options.created_timestamp_column;
@@ -114,7 +118,7 @@ DbEntity.prototype.fetchMetadata = function(){
           self.metadata.push(c);
         });
 
-        LOGGER.silly("Finalized Metadata: "+JSON.stringify(self.metadata,null,2));
+        LOGGER.silly("Finalized Metadata: "+JSON.stringify(self.metadata));
         resolve(self.metadata);
       })
       .catch(function(err){
@@ -694,6 +698,36 @@ DbEntity.prototype._appendOrderByAndLimit = function(sql, opts){
   sql+=limit;
 
   return sql;
+}
+
+/**
+  Constructs an object for persistence by scraping the attributes from an object
+  which match the expected attributes on the data object, and disregarding all
+  attributes that are otherwise unexpected. This can be useful when
+  controllers are retrieving values from a web form or other source of
+  user-provided data.
+  @param obj {object} from which to derive the backing entity.
+*/
+DbEntity.prototype.from = function(obj){
+  var self = this;
+  return new Promise(function(resolve, reject){
+    self.fetchMetadata()
+    .then(function(metadata){
+      var x = {};
+      _.each( metadata, function(meta){
+        var v = obj[meta.column];
+        LOGGER.silly(v);
+        if(!_.isUndefined(v) && !_.isArray(v)){
+          //Note: explicit nulls will be set on the returned object.
+          x[meta.column] = v;
+        }
+      });
+      return resolve(x);
+    })
+    .catch(function(err){
+      return reject(err);
+    });
+  });
 }
 
 /**
