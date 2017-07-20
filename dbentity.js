@@ -686,12 +686,13 @@ DbEntity.prototype._appendOrderByAndLimit = function(sql, opts){
     }
   }
   if(orderBy === ''){
-    sql+=' ORDER BY ';
-
     var pks = _.filter(self.metadata, {pk: true});
-    for(var i=0; i<pks.length; i++){
-      if(i>0) orderBy+=', '
-      sql+=pks[i].column + ' ASC';
+    if(pks.length > 0){
+      sql+=' ORDER BY ';
+      for(var i=0; i<pks.length; i++){
+        if(i>0) orderBy+=', '
+        sql+=pks[i].column + ' ASC';
+      }
     }
   }
   sql+=orderBy;
