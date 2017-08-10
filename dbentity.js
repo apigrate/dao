@@ -1,4 +1,4 @@
-//v 1.0.4
+//v 1.0.5
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
