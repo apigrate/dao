@@ -1,4 +1,4 @@
-//v 1.0.5
+//v 1.0.6
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
@@ -232,7 +232,7 @@ DbEntity.prototype.find = function(query, opts){
       if(!_.isNil(opts) && !_.isNil(opts.booleanMode)){
         bool=' '+opts.booleanMode+' ';
       }
-      sql+=' WHERE ';
+
       var where = '';
       _.each(query, function(v, k){
         if(where!=='') where+=bool;
@@ -240,7 +240,10 @@ DbEntity.prototype.find = function(query, opts){
 
         parms.push(v);
       });
-      sql+=where;
+      if(where!==''){
+        sql+=' WHERE ';
+        sql+=where;
+      }
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
@@ -316,9 +319,10 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
     .then(function(){
       var sql = "SELECT * FROM "+ self.table + " ";
 
-      sql+=' WHERE ';
-
-      sql+=where;
+      if(where && where!==''){
+        sql+=' WHERE ';
+        sql+=where;
+      }
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
@@ -494,7 +498,7 @@ DbEntity.prototype.update = function(save, opts){
       });
 
       sql+=sets;
-      sql+=' WHERE ';
+
       var pks = _.filter(self.metadata,{ pk: true })
       var where = '';
       _.each(pks, function(col){
@@ -504,7 +508,10 @@ DbEntity.prototype.update = function(save, opts){
         var parmVal = save[col.column];
         parms.push(parmVal);
       });
-      sql+=where;
+      if(where!==''){
+        sql+=' WHERE ';
+        sql+=where;
+      }
 
       LOGGER.debug('  update sql: ' + sql);
       LOGGER.debug('  update parameters: ' + JSON.stringify(parms));
@@ -549,6 +556,9 @@ DbEntity.prototype.deleteOne = function(toDelete){
         var parmVal = toDelete[col.column];
         parms.push(parmVal);
       });
+      if(where===''){
+        throw new Error('Could not generate WHERE clause for delete. No primary keys detected.')
+      }
       sql+=where;
 
       LOGGER.debug('  deleteOne sql: ' + sql);
@@ -657,6 +667,9 @@ DbEntity.prototype.deleteWhere = function(where, parms){
     .then(function(){
       var sql = "DELETE FROM " + self.table;
       sql+=' WHERE ';
+      if(_.isNil(where) || where===''){
+        throw new Error('Could not delete. A WHERE clause must be provided.');
+      }
       sql+=where;
 
       LOGGER.debug('  deleteWhere sql: ' + sql);
