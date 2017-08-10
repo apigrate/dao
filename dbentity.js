@@ -291,7 +291,7 @@ DbEntity.prototype.one = function(query, opts){
 
 /**
   Typically used for complex queries or reporting, this function performs a
-  traditional generic sql query selecting anything matching the given WHERE clause
+  sql query on the table backing the entity, selecting anything matching the given WHERE clause
   (do not include the word 'WHERE') and parameters. To avoid SQL injection
   risks, take care to only use this function when user input CANNOT
   affect the WHERE clause being built. It is highly recommended to use
@@ -337,6 +337,47 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
     });
   });
 };//selectWhere
+
+/**
+  Executes the given generic select statement.
+  @param select {string} parameterized select statement (omitting the ORDER BY, LIMIT, and OFFSET,
+  which should be provided in the opts parameter).
+  @param parms {array} individual data parameters for substitution into the statement
+  @param opts {object} query options (not particularly relevant for this function, but available)
+  @example
+  {
+    orderBy: ['+column_name','-column_name'],
+    limit: 1000,
+    offset: 2500,
+    booleanMode: 'OR'
+  }
+*/
+DbEntity.prototype.select = function(select, parms, opts){
+  var self = this;
+  return new Promise(function(resolve, reject){
+    LOGGER.debug(self.entity +' select...');
+    var rs = [];
+    self.fetchMetadata()
+    .then(function(){
+      var sql = select;
+
+      sql = self._appendOrderByAndLimit(sql, opts);
+
+      LOGGER.debug('  query sql: ' + sql);
+      LOGGER.debug('  query parms: ' + JSON.stringify(parms));
+      return self.callDb(sql, []);
+    })
+    .then(function(results){
+      LOGGER.debug(self.entity +' select results:' + JSON.stringify(results));
+      rs = results;
+      resolve(rs);
+    })
+    .catch(function(err){
+      LOGGER.error(self.entity +' select error. Details:\n' + JSON.stringify(err));
+      reject(err);
+    });
+  });
+};//select
 
 /**
   Creates a single entity.
