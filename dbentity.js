@@ -1,4 +1,4 @@
-//v 1.0.7
+//v 1.0.8
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
@@ -472,30 +472,39 @@ DbEntity.prototype.update = function(save, opts){
         //Exists on not_pks?
         var col = _.find(not_pks, {column: k});
         if(!_.isNil(col)){
-          if (self.options && col.column===self.options.created_timestamp_column){
-            //not part of sql
+          if (
+            (self.options && col.column===self.options.created_timestamp_column)
+            || (self.options && col.column===self.options.version_number_column)
+            || (self.options && col.column===self.options.updated_timestamp_column)){
+            //ignore here.
           } else {
             if(sets!=='') sets+=', ';
-            var needParm = false;
-            if(self.options && col.column===self.options.version_number_column){
-              sets+=self.options.version_number_column+'='+self.options.version_number_column+'+1';
-            } else if (self.options && col.column===self.options.updated_timestamp_column){
-              sets+=col.column+'=CURRENT_TIMESTAMP'
-            } else {
-              needParm = true;
-              sets+=col.column+'=?';
-            }
 
-            if(needParm){
-              var parmVal = _transformToSafeValue(v, col);
-              if(_.isNil(parmVal)){
-                parmVal = null;
-              }
-              parms.push(parmVal);
+            sets+=col.column+'=?';
+
+            var parmVal = _transformToSafeValue(v, col);
+            if(_.isNil(parmVal)){
+              parmVal = null;
             }
+            parms.push(parmVal);
+
           }
         }
       });
+
+      if(sets === ''){
+        throw new Error('No data was provided to update.');
+      }
+
+      //additional versioning SET clause
+      var versioning = '';
+      if(self.options.updated_timestamp_column){
+        versioning += ', ' + self.options.updated_timestamp_column + '=CURRENT_TIMESTAMP';
+      }
+      if(self.options.version_number_column){
+        versioning += ', ' + self.options.version_number_column + '=' + self.options.version_number_column + '+1';
+      }
+      sets+=versioning;
 
       sql+=sets;
 
