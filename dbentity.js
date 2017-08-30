@@ -1,4 +1,4 @@
-//v 1.0.8
+//v 1.0.9
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
@@ -328,7 +328,7 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
 
       LOGGER.debug('  query sql: ' + sql);
       LOGGER.debug('  query parms: ' + JSON.stringify(parms));
-      return self.callDb(sql, []);
+      return self.callDb(sql, parms);
     })
     .then(function(results){
       LOGGER.debug(self.entity +' selectWhere results:' + JSON.stringify(results));
