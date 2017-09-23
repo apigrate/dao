@@ -1,4 +1,4 @@
-//v 1.0.9
+//v1.0.10
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
@@ -95,7 +95,7 @@ DbEntity.prototype.fetchMetadata = function(){
 
       self.callDb(sql, [])
       .then(function(results){
-        LOGGER.silly(self.entity +' fetchMetadata raw results:' + JSON.stringify(results));
+        //LOGGER.silly(self.entity +' fetchMetadata raw results:' + JSON.stringify(results));
         //init the metadata object.
         self.metadata = [];
         _.each(results, function(item){
@@ -118,16 +118,16 @@ DbEntity.prototype.fetchMetadata = function(){
           self.metadata.push(c);
         });
 
-        LOGGER.silly("Finalized Metadata: "+JSON.stringify(self.metadata));
+        //LOGGER.silly("Finalized Metadata: "+JSON.stringify(self.metadata));
         resolve(self.metadata);
       })
       .catch(function(err){
-        LOGGER.error(self.entity +' fetchMetadata error. Details: ' + JSON.stringify(err));
+        LOGGER.error(self.entity +' fetchMetadata error. Details: ' + err.message);
         reject(err);
       });
 
     } else {
-      LOGGER.silly("(Metadata already loaded)");
+      //LOGGER.silly("(Metadata already loaded)");
       resolve(self.metadata);
     }
   });
@@ -157,7 +157,7 @@ DbEntity.prototype.get = function(id){
       resolve(entity);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' get error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' get error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -196,7 +196,7 @@ DbEntity.prototype.all = function(opts){
       resolve(rs);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' all error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' all error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -256,7 +256,7 @@ DbEntity.prototype.find = function(query, opts){
       resolve(results);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' find error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' find error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -336,7 +336,7 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
       resolve(rs);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' selectWhere error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' selectWhere error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -377,7 +377,7 @@ DbEntity.prototype.select = function(select, parms, opts){
       resolve(rs);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' select error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' select error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -443,7 +443,7 @@ DbEntity.prototype.create = function(save, opts){
       resolve(save);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' create error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' create error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -533,7 +533,7 @@ DbEntity.prototype.update = function(save, opts){
       resolve(save);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' update error. Details: \n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' update error. Details: ' + err.message);
       reject(err);
     });
 
@@ -581,7 +581,7 @@ DbEntity.prototype.deleteOne = function(toDelete){
       resolve(toDelete);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' deleteOne error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' deleteOne error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -612,7 +612,7 @@ DbEntity.prototype.delete = function(id){
       resolve(entity);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' delete error. Details:\n' + JSON.stringify(err));
+      LOGGER.error(self.entity +' delete error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -652,8 +652,8 @@ DbEntity.prototype.deleteMatching = function(criteria){
       resolve(criteria);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' deleteMatching error. Details:\n' + JSON.stringify(err));
-      reject(err.code);
+      LOGGER.error(self.entity +' deleteMatching error. Details: ' + err.message);
+      reject(err);
     });
   });
 };
@@ -692,8 +692,8 @@ DbEntity.prototype.deleteWhere = function(where, parms){
       resolve(ret);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' deleteWhere error. Details:\n' + JSON.stringify(err));
-      reject(err.code);
+      LOGGER.error(self.entity +' deleteWhere error. Details: ' + err.message);
+      reject(err);
     });
   });
 };
@@ -780,7 +780,6 @@ DbEntity.prototype.from = function(obj){
       var x = {};
       _.each( metadata, function(meta){
         var v = obj[meta.column];
-        LOGGER.silly(v);
         if(!_.isUndefined(v) && !_.isArray(v)){
           //Note: explicit nulls will be set on the returned object.
           x[meta.column] = v;
