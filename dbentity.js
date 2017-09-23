@@ -1,4 +1,4 @@
-//v1.0.10
+//v1.0.11
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
@@ -164,6 +164,35 @@ DbEntity.prototype.get = function(id){
 };
 
 /**
+  Similar to the get function, this function just returns a count (1 or 0) of whether the
+  entity exists or not, without retrieving the actual entity, again the PK is
+  assumed to be named 'id'.
+  @return promise for the count (1 or 0).
+*/
+DbEntity.prototype.exists = function(id){
+  var self = this;
+  return new Promise(function(resolve, reject){
+    LOGGER.debug(self.entity +' exists...');
+    var entity = {};
+
+    self.fetchMetadata()
+    .then(function(){
+      var sql = "SELECT count(*) as count FROM "+ self.table + " WHERE id = ?";
+      LOGGER.debug('  query sql: ' + sql);
+      return self.callDb(sql, [id]);
+    })
+    .then(function(results){
+      LOGGER.silly(self.entity +' exists results:' + JSON.stringify(results));
+      resolve(results[0].count);
+    })
+    .catch(function(err){
+      LOGGER.error(self.entity +' exists error. Details: ' + err.message);
+      reject(err);
+    });
+  });
+};
+
+/**
   Select all (up to 1000) of a kind of entity.
   @return promise for entity.
   @param opts options to cover orderBy and limit options
@@ -204,13 +233,13 @@ DbEntity.prototype.all = function(opts){
 
 /**
   Performs a query for all rows matching the given template object.
-  @param query 'template' object that is used to match the query.
+  @param {object} query (optional) 'template' object that is used to match the query.
 
   All attributes provided on the query object (including those assigned a null
   value) are assumed to be 'ANDed' together.
 
   If you wish an 'OR' instead, add an opts.booleanMode : 'OR'
-  @param opts {object} query options
+  @param {object} opts (optional) query options
   @example
   {
     orderBy: ['+column_name','-column_name'],
@@ -263,7 +292,67 @@ DbEntity.prototype.find = function(query, opts){
 };//find
 
 /**
-  Same as find, except it returns one row or an empty object if
+  Similar to the find function. This function counts all rows matching the given
+  template object.
+  @param {object} query (optional) 'template' object that is used to match the query.
+
+  All attributes provided on the query object (including those assigned a null
+  value) are assumed to be 'ANDed' together.
+
+  If you wish an 'OR' instead, add an opts.booleanMode : 'OR'
+  @param {object} opts (optional) query options
+  @example
+  {
+    limit: 1000,
+    offset: 2500,
+    booleanMode: 'OR'
+  }
+*/
+DbEntity.prototype.count = function(query, opts){
+  var self = this;
+  return new Promise(function(resolve, reject){
+    LOGGER.debug(self.entity +' find...');
+
+    self.fetchMetadata()
+    .then(function(){
+      var sql = "SELECT count(*) as count FROM "+ self.table + " ";
+      var parms = [];
+      var bool = ' AND ';
+      if(!_.isNil(opts) && !_.isNil(opts.booleanMode)){
+        bool=' '+opts.booleanMode+' ';
+      }
+
+      var where = '';
+      _.each(query, function(v, k){
+        if(where!=='') where+=bool;
+        where += k+'=?';
+
+        parms.push(v);
+      });
+      if(where!==''){
+        sql+=' WHERE ';
+        sql+=where;
+      }
+
+      sql = self._appendOrderByAndLimit(sql, opts);
+
+      LOGGER.debug('  query sql: ' + sql);
+      LOGGER.debug('  query parms: ' + JSON.stringify(parms));
+      return self.callDb(sql, parms);
+    })
+    .then(function(results){
+      LOGGER.debug(self.entity +' find results:' + JSON.stringify(results));
+      resolve(results[0].count);
+    })
+    .catch(function(err){
+      LOGGER.error(self.entity +' find error. Details: ' + err.message);
+      reject(err);
+    });
+  });
+};//find
+
+/**
+  Same as the find function, except it returns one row or an empty object if
   nothing is found.
   @param opts {object} query options (not particularly relevant for this function, but available)
   @example
@@ -451,7 +540,8 @@ DbEntity.prototype.create = function(save, opts){
 
 /**
   Updates a single row by id.
-  @param object to save.
+  @param object to save. Only the attributes provided are updated (i.e. performs
+  a "sparse" update).
   @return a promise bearing the save object. An _affectedRows attribute will
   be added to this object. Any defaults in the database will
   NOT be included in the returned object, and you should retrieve the object
