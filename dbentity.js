@@ -1,4 +1,3 @@
-//v1.0.11
 var _ = require('lodash');
 var Promise = require('bluebird');
 var moment = require('moment');
@@ -6,6 +5,7 @@ var winston = require('winston');
 
 /**
   Class to provide basic SQL persistence operations.
+  @version 1.0.12
   @param {string} table required db table name
   @param {string} entity required logical entity name (singular form)
   @param {object} opts optional options settings to override defaults, shown below
@@ -150,6 +150,7 @@ DbEntity.prototype.get = function(id){
       return self.callDb(sql, [id]);
     })
     .then(function(results){
+      LOGGER.debug(self.entity +' get result count: ' + results.length);
       LOGGER.silly(self.entity +' get results:' + JSON.stringify(results));
       if(results.length>0){
         entity = results[0];
@@ -182,6 +183,7 @@ DbEntity.prototype.exists = function(id){
       return self.callDb(sql, [id]);
     })
     .then(function(results){
+      LOGGER.debug(self.entity +' exists result count: ' + results[0].count);
       LOGGER.silly(self.entity +' exists results:' + JSON.stringify(results));
       resolve(results[0].count);
     })
@@ -220,7 +222,8 @@ DbEntity.prototype.all = function(opts){
       return self.callDb(sql, []);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' all results:' + JSON.stringify(results));
+      LOGGER.debug(self.entity +' all result count: ' + results.length);
+      LOGGER.silly(self.entity +' all results:' + JSON.stringify(results));
       rs = results;
       resolve(rs);
     })
@@ -281,7 +284,8 @@ DbEntity.prototype.find = function(query, opts){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' find results:' + JSON.stringify(results));
+      LOGGER.debug(self.entity +' find result count: ' + results.length);
+      LOGGER.silly(self.entity +' find results: ' + JSON.stringify(results));
       resolve(results);
     })
     .catch(function(err){
@@ -311,7 +315,7 @@ DbEntity.prototype.find = function(query, opts){
 DbEntity.prototype.count = function(query, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' find...');
+    LOGGER.debug(self.entity +' count...');
 
     self.fetchMetadata()
     .then(function(){
@@ -341,11 +345,12 @@ DbEntity.prototype.count = function(query, opts){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' find results:' + JSON.stringify(results));
+      LOGGER.debug(self.entity +' count result count: ' + results[0].count);
+      LOGGER.silly(self.entity +' count results:' + JSON.stringify(results));
       resolve(results[0].count);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' find error. Details: ' + err.message);
+      LOGGER.error(self.entity +' count error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -366,6 +371,7 @@ DbEntity.prototype.count = function(query, opts){
 DbEntity.prototype.one = function(query, opts){
   var self = this;
   return new Promise(function(resolve, reject){
+    LOGGER.debug(self.entity +' one...');
     var entity = {};
     return self.find(query,opts)
     .then(function(result){
@@ -420,7 +426,8 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' selectWhere results:' + JSON.stringify(results));
+      LOGGER.debug(self.entity +' selectWhere result count: ' + results.length);
+      LOGGER.silly(self.entity +' selectWhere results:' + JSON.stringify(results));
       rs = results;
       resolve(rs);
     })
@@ -461,7 +468,8 @@ DbEntity.prototype.select = function(select, parms, opts){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' select results:' + JSON.stringify(results));
+      LOGGER.debug(self.entity +' select result count: ' + results.length);
+      LOGGER.silly(self.entity +' select results:' + JSON.stringify(results));
       rs = results;
       resolve(rs);
     })
@@ -619,7 +627,8 @@ DbEntity.prototype.update = function(save, opts){
     })
     .then(function(results){
       save._affectedRows = results.affectedRows;
-      LOGGER.debug(self.entity +' update results:' + JSON.stringify(results));
+      LOGGER.silly(self.entity +' update raw results:' + JSON.stringify(results));
+      LOGGER.debug(self.entity +' update results:' + JSON.stringify(save));
       resolve(save);
     })
     .catch(function(err){
@@ -666,8 +675,9 @@ DbEntity.prototype.deleteOne = function(toDelete){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' deleteOne results:' + JSON.stringify(results));
+      LOGGER.silly(self.entity +' deleteOne raw results:' + JSON.stringify(results));
       toDelete._affectedRows = results.affectedRows;
+      LOGGER.debug(self.entity +' deleteOne results:' + JSON.stringify(toDelete));
       resolve(toDelete);
     })
     .catch(function(err){
@@ -697,8 +707,9 @@ DbEntity.prototype.delete = function(id){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' delete results:' + JSON.stringify(results));
+      LOGGER.silly(self.entity +' delete raw results:' + JSON.stringify(results));
       entity = {_affectedRows: results.affectedRows};
+      LOGGER.debug(self.entity +' delete results:' + JSON.stringify(entity));
       resolve(entity);
     })
     .catch(function(err){
@@ -737,8 +748,9 @@ DbEntity.prototype.deleteMatching = function(criteria){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' deleteMatching results:' + JSON.stringify(results));
+      LOGGER.silly(self.entity +' deleteMatching raw results:' + JSON.stringify(results));
       criteria._affectedRows = results.affectedRows;
+      LOGGER.debug(self.entity +' deleteMatching results:' + JSON.stringify(criteria));
       resolve(criteria);
     })
     .catch(function(err){
@@ -777,8 +789,9 @@ DbEntity.prototype.deleteWhere = function(where, parms){
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' deleteWhere results:' + JSON.stringify(results));
+      LOGGER.silly(self.entity +' deleteWhere raw results:' + JSON.stringify(results));
       ret = { _affectedRows : results.affectedRows };
+      LOGGER.debug(self.entity +' deleteWhere results:' + JSON.stringify(ret));
       resolve(ret);
     })
     .catch(function(err){
@@ -875,6 +888,8 @@ DbEntity.prototype.from = function(obj){
           x[meta.column] = v;
         }
       });
+      LOGGER.debug(self.entity +' from results:' + JSON.stringify(x));
+
       return resolve(x);
     })
     .catch(function(err){
