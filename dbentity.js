@@ -5,7 +5,7 @@ var winston = require('winston');
 
 /**
   Class to provide basic SQL persistence operations.
-  @version 1.0.12
+  @version 1.1.0
   @param {string} table required db table name
   @param {string} entity required logical entity name (singular form)
   @param {object} opts optional options settings to override defaults, shown below
@@ -731,6 +731,7 @@ DbEntity.prototype.deleteMatching = function(criteria){
 
     self.fetchMetadata().then(function(){
       var parms = [];
+      var sql = "DELETE FROM " + self.table;
       var bool = ' AND ';
       sql+=' WHERE ';
       var where = '';
