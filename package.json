@@ -13,8 +13,8 @@
   "keywords": [
     "Mysql"
   ],
-  "author": "Derek R. Gau",
-  "license": "UNLICENSED",
+  "author": "Derek Gau",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/gaumeister/mysqlutils/issues"
   },
