@@ -37,7 +37,7 @@ Work directly on any table in your mysql database using any of the following fun
 __Important Prerequsite__: your app should configure a [mysql connection pool](https://www.npmjs.com/package/mysql#pooling-connections) that it can pass to this library. This library is not opinionated about connection management. It does not close or otherwise manage pool connections directly.
 
 
-```
+```javascript
 //var pool = (assumed to be provided by your app)
 const MyTable = require('@apigrate/mysqlutils');
 
@@ -55,7 +55,7 @@ var Customer = new MyTable('t_customer', 'customer', opts, pool);
 ## Read/Query
 
 ### Get by id.
-```
+```javascript
 //Get a customer by id=27
 Customer.get(27)
 .then(function(cust){
@@ -68,7 +68,7 @@ Customer.get(27)
 ```
 
 ### Find
-```
+```javascript
 //Search for customers where status='active' and city='Chicago'
 Customer.find({status: 'active', city: 'Chicago'})
 .then(function(customers){
@@ -97,7 +97,7 @@ Customer.find({status: 'active', city: 'Chicago'})
 ### Support for Logging
 It is possible (and recommended) to inject a logger when you construct references to your tables. The library currently expects a logger that supports [winston](https://www.npmjs.com/package/winston)-style syntax. Here's an example.
 
-```
+```javascript
 //assume MyTable, opts, pool from earlier example
 
 var winston = require('winston');
@@ -124,8 +124,8 @@ var Customer = new MyTable('t_customer', 'customer', opts, pool, logger);
 2. at __warn__ level, currently no warnings are issued, so effectively the same as __error__
 3. at __info__ level, currently no info messages are logged, so effectively the same as __warn__
 4. at __debug__ level, the following is logged:
-  1. method call announcement
-  2. SQL used for query/execution
-  3. a count of the results (if any).
+   * method call announcement
+   * SQL used for query/execution
+   * a count of the results (if any).
 5. at __silly__ (aka trace) level, the following is logged:
-  1. raw SQL command output from the underlying mysql library
+   * raw SQL command output from the underlying mysql library
