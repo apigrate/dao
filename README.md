@@ -42,7 +42,7 @@ __Important Prerequsite__: your app should configure a [mysql connection pool](h
 const MyTable = require('@apigrate/mysqlutils');
 
 //An optional configuration object containing some options that you might want to use on a table.  
-//
+
 var opts = {
   created_timestamp_column: 'created',
   updated_timestamp_column: 'updated',
@@ -55,11 +55,15 @@ var Customer = new MyTable('t_customer', 'customer', opts, pool);
 ## Read/Query
 
 ### Get by id.
+Get a single table row by id and return it as an object.
 ```javascript
 //Get a customer by id=27
+
 Customer.get(27)
 .then(function(cust){
-  console.log(JSON.stringify(cust));
+
+  //cust = {id: 27, name: 'John Smith', city: 'Chicago', active: true ... }
+  
 })
 .catch(function(err){
   console.error(err.message);
@@ -70,10 +74,13 @@ Customer.get(27)
 ### Find
 ```javascript
 //Search for customers where status='active' and city='Chicago'
+
 Customer.find({status: 'active', city: 'Chicago'})
 .then(function(customers){
-  //customers: an array of customer objects.
-  console.log( 'Found ' + customer.length + ' customers.');
+
+  //customers: an array of customer objects like,
+  // [ {id: 27, name: 'John Smith', city: 'Chicago' active: true ... }, {id: 28, name: 'Sally Woo', city: 'Chicago', active: true ... }, ...]
+
 })
 .catch(function(err){
   console.error(err.message);
