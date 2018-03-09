@@ -57,6 +57,6 @@ typings/
 # dotenv environment variables file
 .env
 
-config/*.json
+config
 
-test/test-dbentity.js
+temp
