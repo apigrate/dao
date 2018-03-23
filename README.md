@@ -39,7 +39,7 @@ __Important Prerequsite__: your app should configure a [mysql connection pool](h
 
 ```javascript
 //var pool = (assumed to be provided by your app)
-const MyTable = require('@apigrate/mysqlutils');
+const DbEntity = require('@apigrate/mysqlutils');
 
 //An optional configuration object containing some options that you might want to use on a table.  
 
@@ -49,7 +49,8 @@ var opts = {
   version_number_column: 'version'
 };
 
-var Customer = new MyTable('t_customer', 'customer', opts, pool);
+var Customer = new DbEntity('t_customer', 'customer', opts, pool);
+//Note, in addition to tables, you use this on views as well...
 ```
 
 ## Read/Query
@@ -63,7 +64,7 @@ Customer.get(27)
 .then(function(cust){
 
   //cust = {id: 27, name: 'John Smith', city: 'Chicago', active: true ... }
-  
+
 })
 .catch(function(err){
   console.error(err.message);
