@@ -148,7 +148,7 @@ CriteriaHelper.prototype._where = function(bool, name, oper, value){
 };
 
 function isEmpty(x){
-  return _.isNil(x) || (_.isArray(x) && x.length===0);
+  return _.isNil(x) || (!_.isArray(x) && x.length===0);
   x = x+'';
   return x.trim() === '';
 }
