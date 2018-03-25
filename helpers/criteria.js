@@ -115,7 +115,7 @@ CriteriaHelper.prototype._where = function(bool, name, oper, value){
   oper = oper.toUpperCase();
 
   //Some operators are unary
-  if(oper!=='IS NOT NULL' && oper==='IS NULL'){
+  if(oper!=='IS NOT NULL' && oper!=='IS NULL'){
 
     if(_.isNil(value) && self.omitNull){
       return self;
@@ -134,13 +134,6 @@ CriteriaHelper.prototype._where = function(bool, name, oper, value){
 
   if(oper==='IS NOT NULL' || oper==='IS NULL'){
     return self;
-  }
-
-  if(oper==='LIKE'){
-    self.whereClause += ' ?'
-    self.parms.push( value );
-    return self;
-
   }
 
   self.whereClause += '?'
