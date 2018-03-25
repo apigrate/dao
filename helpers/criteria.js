@@ -136,8 +136,14 @@ CriteriaHelper.prototype._where = function(bool, name, oper, value){
     return self;
   }
 
-  self.whereClause += '?'
-  self.parms.push( value );
+  if(oper==='LIKE'){
+    self.whereClause += ' ?';//extra space is significant.
+    self.parms.push( value );
+  } else {
+    self.whereClause += '?';
+    self.parms.push( value );
+  }
+
   return self;
 };
 
