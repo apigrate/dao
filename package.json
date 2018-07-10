@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/gaumeister/mysqlutils#readme",
   "dependencies": {
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.10",
     "moment": "^2.21.0",
     "mysql": "^2.15.0"
   },
