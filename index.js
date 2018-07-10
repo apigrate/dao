@@ -18,7 +18,7 @@ var moment = require('moment');
 
 /**
   Class to provide basic SQL persistence operations.
-  @version 2.1.3
+  @version 2.2.0
   @param {string} table required db table name
   @param {string} entity required logical entity name (singular form)
   @param {object} opts optional options settings to override defaults, shown below
@@ -150,7 +150,7 @@ DbEntity.prototype.fetchMetadata = function(){
   Syntactic sugar for selectOne, selecting a single entity by its PK named 'id'.
   @return promise for entity. If not found, the empty object {} will be returned.
 */
-DbEntity.prototype.get = function(id){
+DbEntity.prototype.get = function(id, opts){
   var self = this;
   return new Promise(function(resolve, reject){
     LOGGER.debug(self.entity +' get...');
@@ -158,7 +158,8 @@ DbEntity.prototype.get = function(id){
 
     self.fetchMetadata()
     .then(function(){
-      var sql = "SELECT * FROM "+ self.table + " WHERE id = ?";
+      var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
+      var sql = "SELECT "+whichcols+" FROM "+ self.table + " WHERE id = ?";
       LOGGER.debug('  query sql: ' + sql);
       return self.callDb(sql, [id]);
     })
@@ -226,7 +227,8 @@ DbEntity.prototype.all = function(opts){
     var rs = [];
     self.fetchMetadata()
     .then(function(){
-      var sql = "SELECT * FROM "+ self.table + " ";
+      var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
+      var sql = "SELECT "+whichcols+" FROM "+ self.table + " ";
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
@@ -271,7 +273,8 @@ DbEntity.prototype.find = function(query, opts){
 
     self.fetchMetadata()
     .then(function(){
-      var sql = "SELECT * FROM "+ self.table + " ";
+      var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
+      var sql = "SELECT "+whichcols+" FROM "+ self.table + " ";
       var parms = [];
       var bool = ' AND ';
       if(!_.isNil(opts) && !_.isNil(opts.booleanMode)){
@@ -425,7 +428,8 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
     var rs = [];
     self.fetchMetadata()
     .then(function(){
-      var sql = "SELECT * FROM "+ self.table + " ";
+      var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
+      var sql = "SELECT "+whichcols+" FROM "+ self.table + " ";
 
       if(where && where!==''){
         sql+=' WHERE ';
