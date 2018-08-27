@@ -911,10 +911,10 @@ DbEntity.prototype._appendOrderByAndLimit = function(sql, opts){
   if(orderBy === ''){
     var pks = _.filter(self.metadata, {pk: true});
     if(pks.length > 0){
-      sql+=' ORDER BY ';
+      orderBy+=' ORDER BY ';
       for(var i=0; i<pks.length; i++){
         if(i>0) orderBy+=', '
-        sql+=pks[i].column + ' ASC';
+        orderBy+=pks[i].column + ' ASC';
       }
     }
   }
