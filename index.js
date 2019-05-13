@@ -18,7 +18,7 @@ var moment = require('moment');
 
 /**
   Class to provide basic SQL persistence operations.
-  @version 2.2.0
+  @version 2.2.3
   @param {string} table required db table name
   @param {string} entity required logical entity name (singular form)
   @param {object} opts optional options settings to override defaults, shown below
