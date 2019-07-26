@@ -1,6 +1,6 @@
 {
   "name": "@apigrate/mysqlutils",
-  "version": "2.2.4",
+  "version": "2.3.0",
   "description": "An easy-to-use Promise-based MySQL ORM implementation.",
   "main": "index.js",
   "scripts": {
