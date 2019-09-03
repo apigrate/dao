@@ -103,37 +103,14 @@ Customer.find({status: 'active', city: 'Chicago'})
 ## More
 
 ### Support for Logging
-It is possible (and recommended) to inject a logger when you construct references to your tables. The library currently expects a logger that supports [winston](https://www.npmjs.com/package/winston)-style syntax. Here's an example.
+The [debug](https://www.npmjs.org/debug) library is used. Use `process.env.NODE_ENV='gr8:db'` for general debugging. For verbose logging (outputs raw responses on create, update, delete operations) use `gr8:db:verbose`.
 
-```javascript
-//assume MyTable, opts, pool from earlier example
-
-var winston = require('winston');
-winston.level='debug';
-
-winston.loggers.add('db', {
-  console: {
-    level: 'debug',
-    colorize: false,
-    label: 'db'
-  }
-});
-
-var logger = winston.loggers.get('db');
-
-var Customer = new MyTable('t_customer', 'customer', opts, pool, logger);
-
-
-```
-
-
+Note: as of version 3.0.0 logger injection is no longer supported and will be ignored.
 #### What gets logged?
-1. at __error__ level, error messages (database exceptions)
-2. at __warn__ level, currently no warnings are issued, so effectively the same as __error__
-3. at __info__ level, currently no info messages are logged, so effectively the same as __warn__
-4. at __debug__ level, the following is logged:
+1. error messages (database exceptions) are logged to `console.error`
+4. at `DEBUG='gr8:db'`, the following is logged:
    * method call announcement
    * SQL used for query/execution
    * a count of the results (if any).
-5. at __silly__ (aka trace) level, the following is logged:
-   * raw SQL command output from the underlying mysql library
+5. at `DEBUG='gr8:db:verbose'`, the following is logged:
+   * raw SQL command output from the underlying mysql library create, update, and delete statements.

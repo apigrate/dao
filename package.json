@@ -1,6 +1,6 @@
 {
   "name": "@apigrate/mysqlutils",
-  "version": "2.3.1",
+  "version": "3.0.0",
   "description": "An easy-to-use Promise-based MySQL ORM implementation.",
   "main": "index.js",
   "scripts": {
@@ -20,8 +20,10 @@
   },
   "homepage": "https://github.com/gaumeister/mysqlutils#readme",
   "dependencies": {
+    "debug": "^4.1.1",
     "lodash": "^4.17.15",
-    "moment": "^2.24.0"
+    "moment": "^2.24.0",
+    "mysql": "^2.17.1"
   },
   "peerDependencies": {
     "mysql": "^2.17.1"

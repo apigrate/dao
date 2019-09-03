@@ -15,10 +15,11 @@
 */
 var _ = require('lodash');
 var moment = require('moment');
+var debug = require('debug')('gr8:db');
+var verbose = require('debug')('gr8:db:verbose');
 
 /**
   Class to provide basic SQL persistence operations.
-  @version 2.2.3
   @param {string} table required db table name
   @param {string} entity required logical entity name (singular form)
   @param {object} opts optional options settings to override defaults, shown below
@@ -31,7 +32,6 @@ var moment = require('moment');
     log_category: 'db'
   }
   @param {object} pool required mysql db pool reference.
-  @param {object} logger optional logger instance.
   @return an object to be used for model persistence.
   @example <caption>Note, internal metadata is stored in the the form</caption>
   [{
@@ -43,9 +43,10 @@ var moment = require('moment');
     is_updated_timestamp: true|false,
     is_version: true|false
   }]
+
+  @version 3.0.0
 */
-function DbEntity(table, entity, opts, pool, logger){
-  LOGGER = logger;
+function DbEntity(table, entity, opts, pool){
   this.pool = pool;
   this.table = table;
   this.entity = entity;
@@ -68,13 +69,6 @@ function DbEntity(table, entity, opts, pool, logger){
     version_number_column: 'version',
     log_category: 'db'
   });
-
-  if(logger && LOGGER.info){
-    LOGGER = logger;
-  } else {
-    //use winston
-    LOGGER = {error: console.log, warn: console.log, info: function(){}, debug: function(){}, silly: function(){} }
-  }
 
   this.metadata = null;//initialized to empty.
 }//constructor
@@ -108,7 +102,7 @@ DbEntity.prototype.fetchMetadata = function(){
 
       self.callDb(sql, [])
       .then(function(results){
-        //LOGGER.silly(self.entity +' fetchMetadata raw results:' + JSON.stringify(results));
+
         //init the metadata object.
         self.metadata = [];
         _.each(results, function(item){
@@ -131,16 +125,14 @@ DbEntity.prototype.fetchMetadata = function(){
           self.metadata.push(c);
         });
 
-        //LOGGER.silly("Finalized Metadata: "+JSON.stringify(self.metadata));
         resolve(self.metadata);
       })
       .catch(function(err){
-        LOGGER.error(self.entity +' fetchMetadata error. Details: ' + err.message);
+        console.error(self.entity +' fetchMetadata error. Details: ' + err.message);
         reject(err);
       });
 
     } else {
-      //LOGGER.silly("(Metadata already loaded)");
       resolve(self.metadata);
     }
   });
@@ -153,26 +145,25 @@ DbEntity.prototype.fetchMetadata = function(){
 DbEntity.prototype.get = function(id, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' get...');
+    debug(self.entity +' get...');
     var entity = {};
 
     self.fetchMetadata()
     .then(function(){
       var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
       var sql = "SELECT "+whichcols+" FROM "+ self.table + " WHERE id = ?";
-      LOGGER.debug('  query sql: ' + sql);
+      debug('  query sql: ' + sql);
       return self.callDb(sql, [id]);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' get result count: ' + results.length);
-      LOGGER.silly(self.entity +' get results:' + JSON.stringify(results));
+      debug(self.entity +' get result count: ' + results.length);
       if(results.length>0){
         entity = results[0];
       }
       resolve(entity);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' get error. Details: ' + err.message);
+      console.error(self.entity +' get error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -187,22 +178,21 @@ DbEntity.prototype.get = function(id, opts){
 DbEntity.prototype.exists = function(id){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' exists...');
+    debug(self.entity +' exists...');
     var entity = {};
 
     self.fetchMetadata()
     .then(function(){
       var sql = "SELECT count(*) as count FROM "+ self.table + " WHERE id = ?";
-      LOGGER.debug('  query sql: ' + sql);
+      debug('  query sql: ' + sql);
       return self.callDb(sql, [id]);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' exists result count: ' + results[0].count);
-      LOGGER.silly(self.entity +' exists results:' + JSON.stringify(results));
+      debug(self.entity +' exists result count: ' + results[0].count);
       resolve(results[0].count);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' exists error. Details: ' + err.message);
+      console.error(self.entity +' exists error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -223,7 +213,7 @@ DbEntity.prototype.exists = function(id){
 DbEntity.prototype.all = function(opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' all...');
+    debug(self.entity +' all...');
     var rs = [];
     self.fetchMetadata()
     .then(function(){
@@ -232,18 +222,17 @@ DbEntity.prototype.all = function(opts){
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
-      LOGGER.debug('  query sql: ' + sql);
+      debug('  query sql: ' + sql);
 
       return self.callDb(sql, []);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' all result count: ' + results.length);
-      LOGGER.silly(self.entity +' all results:' + JSON.stringify(results));
+      debug(self.entity +' all result count: ' + results.length);
       rs = results;
       resolve(rs);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' all error. Details: ' + err.message);
+      console.error(self.entity +' all error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -269,7 +258,7 @@ DbEntity.prototype.all = function(opts){
 DbEntity.prototype.find = function(query, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' find...');
+    debug(self.entity +' find...');
 
     self.fetchMetadata()
     .then(function(){
@@ -295,17 +284,16 @@ DbEntity.prototype.find = function(query, opts){
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
-      LOGGER.debug('  query sql: ' + sql);
-      LOGGER.debug('  query parms: ' + JSON.stringify(parms));
+      debug('  query sql: ' + sql);
+      debug('  query parms: ' + JSON.stringify(parms));
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' find result count: ' + results.length);
-      LOGGER.silly(self.entity +' find results: ' + JSON.stringify(results));
+      debug(self.entity +' find result count: ' + results.length);
       resolve(results);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' find error. Details: ' + err.message);
+      console.error(self.entity +' find error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -331,7 +319,7 @@ DbEntity.prototype.find = function(query, opts){
 DbEntity.prototype.count = function(query, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' count...');
+    debug(self.entity +' count...');
 
     self.fetchMetadata()
     .then(function(){
@@ -356,17 +344,16 @@ DbEntity.prototype.count = function(query, opts){
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
-      LOGGER.debug('  query sql: ' + sql);
-      LOGGER.debug('  query parms: ' + JSON.stringify(parms));
+      debug('  query sql: ' + sql);
+      debug('  query parms: ' + JSON.stringify(parms));
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' count result count: ' + results[0].count);
-      LOGGER.silly(self.entity +' count results:' + JSON.stringify(results));
+      debug(self.entity +' count result count: ' + results[0].count);
       resolve(results[0].count);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' count error. Details: ' + err.message);
+      console.error(self.entity +' count error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -387,7 +374,7 @@ DbEntity.prototype.count = function(query, opts){
 DbEntity.prototype.one = function(query, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' one...');
+    debug(self.entity +' one...');
     var entity = {};
     return self.find(query,opts)
     .then(function(result){
@@ -424,7 +411,7 @@ DbEntity.prototype.one = function(query, opts){
 DbEntity.prototype.selectWhere = function(where, parms, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' selectWhere...');
+    debug(self.entity +' selectWhere...');
     var rs = [];
     self.fetchMetadata()
     .then(function(){
@@ -438,18 +425,17 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
-      LOGGER.debug('  query sql: ' + sql);
-      LOGGER.debug('  query parms: ' + JSON.stringify(parms));
+      debug('  query sql: ' + sql);
+      debug('  query parms: ' + JSON.stringify(parms));
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' selectWhere result count: ' + results.length);
-      LOGGER.silly(self.entity +' selectWhere results:' + JSON.stringify(results));
+      debug(self.entity +' selectWhere result count: ' + results.length);
       rs = results;
       resolve(rs);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' selectWhere error. Details: ' + err.message);
+      console.error(self.entity +' selectWhere error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -472,7 +458,7 @@ DbEntity.prototype.selectWhere = function(where, parms, opts){
 DbEntity.prototype.select = function(select, parms, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug(self.entity +' select...');
+    debug(self.entity +' select...');
     var rs = [];
     self.fetchMetadata()
     .then(function(){
@@ -480,18 +466,17 @@ DbEntity.prototype.select = function(select, parms, opts){
 
       sql = self._appendOrderByAndLimit(sql, opts);
 
-      LOGGER.debug('  query sql: ' + sql);
-      LOGGER.debug('  query parms: ' + JSON.stringify(parms));
+      debug('  query sql: ' + sql);
+      debug('  query parms: ' + JSON.stringify(parms));
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.debug(self.entity +' select result count: ' + results.length);
-      LOGGER.silly(self.entity +' select results:' + JSON.stringify(results));
+      debug(self.entity +' select result count: ' + results.length);
       rs = results;
       resolve(rs);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' select error. Details: ' + err.message);
+      console.error(self.entity +' select error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -507,7 +492,7 @@ DbEntity.prototype.select = function(select, parms, opts){
 DbEntity.prototype.create = function(save, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug( self.entity + ' create...' );
+    debug( self.entity + ' create...' );
     self.fetchMetadata()
     .then(function(){
       var parms = [];
@@ -534,13 +519,13 @@ DbEntity.prototype.create = function(save, opts){
       var sql = "INSERT INTO " + self.table + " ("+ cols +") VALUES (" + vals + ");";
 
 
-      LOGGER.debug('  create sql: ' + sql);
-      LOGGER.debug('  create parameters: ' + JSON.stringify(parms));
+      debug('  create sql: ' + sql);
+      debug('  create parameters: ' + JSON.stringify(parms));
 
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.silly('  create raw results: ' + JSON.stringify(results));
+      verbose('  create raw results: ' + JSON.stringify(results));
       //Put the autogenerated id on the entity and return it.
       if(results.affectedRows > 0 && !_.isNil(results.insertId) && results.insertId > 0){
         //console.log('----- id ' + results.insertId)
@@ -551,11 +536,11 @@ DbEntity.prototype.create = function(save, opts){
         //console.log('----- keycol ' + JSON.stringify(keyCol));
 
       }
-      LOGGER.debug(self.entity +' create results:' + JSON.stringify(results));
+      debug(self.entity +' create results:' + JSON.stringify(results));
       resolve(save);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' create error. Details: ' + err.message);
+      console.error(self.entity +' create error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -573,7 +558,7 @@ DbEntity.prototype.create = function(save, opts){
 DbEntity.prototype.update = function(save, opts){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug( self.entity + ' update...' );
+    debug( self.entity + ' update...' );
 
     self.fetchMetadata().then(function(){
       var parms = [];
@@ -635,19 +620,19 @@ DbEntity.prototype.update = function(save, opts){
         sql+=where;
       }
 
-      LOGGER.debug('  update sql: ' + sql);
-      LOGGER.debug('  update parameters: ' + JSON.stringify(parms));
+      debug('  update sql: ' + sql);
+      debug('  update parameters: ' + JSON.stringify(parms));
 
       return self.callDb(sql, parms);
     })
     .then(function(results){
       save._affectedRows = results.affectedRows;
-      LOGGER.silly(self.entity +' update raw results:' + JSON.stringify(results));
-      LOGGER.debug(self.entity +' update results:' + JSON.stringify(save));
+      verbose(self.entity +' update raw results:' + JSON.stringify(results));
+      debug(self.entity +' update results:' + JSON.stringify(save));
       resolve(save);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' update error. Details: ' + err.message);
+      console.error(self.entity +' update error. Details: ' + err.message);
       reject(err);
     });
 
@@ -667,7 +652,7 @@ DbEntity.prototype.save = function(save, opts){
   //Get pks.
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug( self.entity + ' update...' );
+    debug( self.entity + ' update...' );
 
     self.fetchMetadata().then(function(){
       var pks = _.filter(self.metadata,{ pk: true });
@@ -690,7 +675,7 @@ DbEntity.prototype.save = function(save, opts){
       }
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' save error. Details: ' + err.message);
+      console.error(self.entity +' save error. Details: ' + err.message);
       reject(err);
     });
   });//promise
@@ -705,7 +690,7 @@ DbEntity.prototype.deleteOne = function(toDelete){
   var self = this;
   return new Promise(function(resolve, reject){
 
-    LOGGER.debug( self.entity + ' delete...' );
+    debug( self.entity + ' delete...' );
 
     self.fetchMetadata()
     .then(function(){
@@ -726,19 +711,19 @@ DbEntity.prototype.deleteOne = function(toDelete){
       }
       sql+=where;
 
-      LOGGER.debug('  deleteOne sql: ' + sql);
-      LOGGER.debug('  deleteOne parameters: ' + JSON.stringify(parms));
+      debug('  deleteOne sql: ' + sql);
+      debug('  deleteOne parameters: ' + JSON.stringify(parms));
 
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.silly(self.entity +' deleteOne raw results:' + JSON.stringify(results));
+      verbose(self.entity +' deleteOne raw results:' + JSON.stringify(results));
       toDelete._affectedRows = results.affectedRows;
-      LOGGER.debug(self.entity +' deleteOne results:' + JSON.stringify(toDelete));
+      debug(self.entity +' deleteOne results:' + JSON.stringify(toDelete));
       resolve(toDelete);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' deleteOne error. Details: ' + err.message);
+      console.error(self.entity +' deleteOne error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -751,26 +736,26 @@ DbEntity.prototype.deleteOne = function(toDelete){
 DbEntity.prototype.delete = function(id){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug( self.entity + ' delete...' );
+    debug( self.entity + ' delete...' );
     var entity = {};
     self.fetchMetadata().then(function(){
       var parms = [id];
       var sql = "DELETE FROM " + self.table;
       sql+=' WHERE id = ?';
 
-      LOGGER.debug('  delete sql: ' + sql);
-      LOGGER.debug('  delete parameters: ' + JSON.stringify(parms));
+      debug('  delete sql: ' + sql);
+      debug('  delete parameters: ' + JSON.stringify(parms));
 
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.silly(self.entity +' delete raw results:' + JSON.stringify(results));
+      verbose(self.entity +' delete raw results:' + JSON.stringify(results));
       entity = {_affectedRows: results.affectedRows};
-      LOGGER.debug(self.entity +' delete results:' + JSON.stringify(entity));
+      debug(self.entity +' delete results:' + JSON.stringify(entity));
       resolve(entity);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' delete error. Details: ' + err.message);
+      console.error(self.entity +' delete error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -784,7 +769,7 @@ DbEntity.prototype.delete = function(id){
 DbEntity.prototype.deleteMatching = function(criteria){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug( self.entity + ' delete...' );
+    debug( self.entity + ' delete...' );
     self.fetchMetadata().then(function(){
       var parms = [];
       var sql = "DELETE FROM " + self.table;
@@ -799,19 +784,19 @@ DbEntity.prototype.deleteMatching = function(criteria){
       });
       sql+=where;
 
-      LOGGER.debug('  deleteMatching sql: ' + sql);
-      LOGGER.debug('  deleteMatching parameters: ' + JSON.stringify(parms));
+      debug('  deleteMatching sql: ' + sql);
+      debug('  deleteMatching parameters: ' + JSON.stringify(parms));
 
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.silly(self.entity +' deleteMatching raw results:' + JSON.stringify(results));
+      verbose(self.entity +' deleteMatching raw results:' + JSON.stringify(results));
       criteria._affectedRows = results.affectedRows;
-      LOGGER.debug(self.entity +' deleteMatching results:' + JSON.stringify(criteria));
+      debug(self.entity +' deleteMatching results:' + JSON.stringify(criteria));
       resolve(criteria);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' deleteMatching error. Details: ' + err.message);
+      console.error(self.entity +' deleteMatching error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -829,7 +814,7 @@ DbEntity.prototype.deleteMatching = function(criteria){
 DbEntity.prototype.deleteWhere = function(where, parms){
   var self = this;
   return new Promise(function(resolve, reject){
-    LOGGER.debug( self.entity + ' deleteWhere...' );
+    debug( self.entity + ' deleteWhere...' );
     var ret = {};
     self.fetchMetadata()
     .then(function(){
@@ -840,19 +825,19 @@ DbEntity.prototype.deleteWhere = function(where, parms){
       }
       sql+=where;
 
-      LOGGER.debug('  deleteWhere sql: ' + sql);
-      LOGGER.debug('  deleteWhere parameters: ' + JSON.stringify(parms));
+      debug('  deleteWhere sql: ' + sql);
+      debug('  deleteWhere parameters: ' + JSON.stringify(parms));
 
       return self.callDb(sql, parms);
     })
     .then(function(results){
-      LOGGER.silly(self.entity +' deleteWhere raw results:' + JSON.stringify(results));
+      verbose(self.entity +' deleteWhere raw results:' + JSON.stringify(results));
       ret = { _affectedRows : results.affectedRows };
-      LOGGER.debug(self.entity +' deleteWhere results:' + JSON.stringify(ret));
+      debug(self.entity +' deleteWhere results:' + JSON.stringify(ret));
       resolve(ret);
     })
     .catch(function(err){
-      LOGGER.error(self.entity +' deleteWhere error. Details: ' + err.message);
+      console.error(self.entity +' deleteWhere error. Details: ' + err.message);
       reject(err);
     });
   });
@@ -945,7 +930,7 @@ DbEntity.prototype.from = function(obj){
           x[meta.column] = v;
         }
       });
-      LOGGER.debug(self.entity +' from results:' + JSON.stringify(x));
+      debug(self.entity +' from results:' + JSON.stringify(x));
 
       return resolve(x);
     })
