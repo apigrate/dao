@@ -204,6 +204,7 @@ DbEntity.prototype.exists = function(id){
   @param opts options to cover orderBy and limit options
   @example
   {
+    columns: ['column1', 'column2', 'column3'], //to be returned
     orderBy: ['+column_name','-column_name'],
     limit: 1000,
     offset: 2500
@@ -249,6 +250,7 @@ DbEntity.prototype.all = function(opts){
   @param {object} opts (optional) query options
   @example
   {
+    columns: ['column1', 'column2', 'column3'], //to be returned
     orderBy: ['+column_name','-column_name'],
     limit: 1000,
     offset: 2500,
@@ -365,6 +367,7 @@ DbEntity.prototype.count = function(query, opts){
   @param opts {object} query options (not particularly relevant for this function, but available)
   @example
   {
+    columns: ['column1', 'column2', 'column3'], //to be returned
     orderBy: ['+column_name','-column_name'],
     limit: 1000,
     offset: 2500,
@@ -402,6 +405,7 @@ DbEntity.prototype.one = function(query, opts){
   @param opts {object} query options (not particularly relevant for this function, but available)
   @example
   {
+    columns: ['column1', 'column2', 'column3'], //to be returned
     orderBy: ['+column_name','-column_name'],
     limit: 1000,
     offset: 2500,
