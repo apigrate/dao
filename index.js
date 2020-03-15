@@ -1,5 +1,5 @@
 /*
-  Copyright 2018 Apigrate, LLC
+  Copyright 2018-2020 Apigrate, LLC
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ var _ = require('lodash');
 var moment = require('moment');
 var debug = require('debug')('gr8:db');
 var verbose = require('debug')('gr8:db:verbose');
+let util = require('util');
 
 /**
   Class to provide basic SQL persistence operations.
@@ -44,69 +45,74 @@ var verbose = require('debug')('gr8:db:verbose');
     is_version: true|false
   }]
 
-  @version 3.0.0
+  @version 4.0.0
 */
-function DbEntity(table, entity, opts, pool){
-  this.pool = pool;
-  this.table = table;
-  this.entity = entity;
+class Dao{
+  constructor (table, entity, opts, pool){ 
+    this.pool = pool;
+    this.table = table;
+    this.entity = entity;
 
-  if(_.isNil(opts)||_.isNil(opts.plural)){
-    if(_.endsWith(entity,'y')){
-      this.plural = entity.substr(0, entity.lastIndexOf('y')) + 'ies';
-    } else if (_.endsWith(entity,'s')) {
-      this.plural = entity.substr(0, entity.lastIndexOf('s')) + 'es';
-    } else {
-      this.plural = entity + 's';
-    }
-  } else {
-    this.plural = opts.plural;
-  }
-
-  this.options = (opts || {
-    created_timestamp_column: 'created',
-    updated_timestamp_column: 'updated',
-    version_number_column: 'version',
-    log_category: 'db'
-  });
-
-  this.metadata = null;//initialized to empty.
-}//constructor
-
-/**
-  Promise-returning function that ensures consistent handling of database calls.
-*/
-DbEntity.prototype.callDb = function(sql, parms){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    self.pool.query(sql, parms, function(err, results, fields){
-      if(err){
-        reject(err);
+    if(_.isNil(opts)||_.isNil(opts.plural)){
+      if(_.endsWith(entity,'y')){
+        this.plural = entity.substr(0, entity.lastIndexOf('y')) + 'ies';
+      } else if (_.endsWith(entity,'s')) {
+        this.plural = entity.substr(0, entity.lastIndexOf('s')) + 'es';
       } else {
-        resolve(results);
+        this.plural = entity + 's';
       }
+    } else {
+      this.plural = opts.plural;
+    }
+
+    this.options = (opts || {
+      created_timestamp_column: 'created',
+      updated_timestamp_column: 'updated',
+      version_number_column: 'version',
+      log_category: 'db'
     });
-  });
-};
 
-/**
-  Initializes the internal metadata for further use.
-  This is a promise-returning function that must be used for any internal
-  method requiring metadata.
-*/
-DbEntity.prototype.fetchMetadata = function(){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    if(_.isNil(self.metadata)){
-      var sql = "SHOW COLUMNS FROM "+ self.table + ";";
+    this.metadata = null;//initialized to empty.
+  }//constructor
 
-      self.callDb(sql, [])
-      .then(function(results){
 
+  /**
+   * Executes a parameterized SQL command (SELECT, INSERT, UPDATE, DELETE, etc.)
+   * @param {string} sql parameterized SQL command
+   * @param {array} parms parameters
+   */
+  async sqlCommand(sql, parms){
+    let self = this;
+    return new Promise(function(resolve, reject){
+      self.pool.query(sql, parms, function(err, result, fields){
+        if(err){
+          reject(err);
+          return;
+        }
+        resolve(result);
+      });
+    });
+  };
+
+  /**
+   * @deprecated
+   * Synonym for sqlCommand
+   */
+  async callDb(sql, parms){ return sqlCommand(sql, parms); }
+
+  /**
+    Initializes the internal metadata for further use.
+    This is a promise-returning function that must be used for any internal
+    method requiring metadata.
+  */
+  async fetchMetadata(){
+    try{
+      if(_.isNil(this.metadata)){
+        var sql = "SHOW COLUMNS FROM "+ this.table + ";";
+
+        let results = await this.sqlCommand(sql, [])
         //init the metadata object.
-        self.metadata = [];
-        _.each(results, function(item){
-
+        this.metadata = results.map(item => {
           var c = {
             column: item.Field,
             sql_type: item.Type,
@@ -118,154 +124,136 @@ DbEntity.prototype.fetchMetadata = function(){
             is_created_timestamp: false,
             is_updated_version: false
           };
-          c.is_updated_timestamp=!_.isNil(self.options.updated_timestamp_column)&&c.column===self.options.updated_timestamp_column;
-          c.is_created_timestamp=!_.isNil(self.options.created_timestamp_column)&&c.column===self.options.created_timestamp_column;
-          c.is_updated_version=!_.isNil(self.options.version_number_column)&&c.column===self.options.version_number_column;
-
-          self.metadata.push(c);
+          c.is_updated_timestamp=!_.isNil(this.options.updated_timestamp_column)&&c.column===this.options.updated_timestamp_column;
+          c.is_created_timestamp=!_.isNil(this.options.created_timestamp_column)&&c.column===this.options.created_timestamp_column;
+          c.is_updated_version=!_.isNil(this.options.version_number_column)&&c.column===this.options.version_number_column;
+          return c;
         });
 
-        resolve(self.metadata);
-      })
-      .catch(function(err){
-        console.error(self.entity +' fetchMetadata error. Details: ' + err.message);
-        reject(err);
-      });
-
-    } else {
-      resolve(self.metadata);
+      } else{
+        return this.metadata;
+      }
+    }catch(ex){
+      console.error(`Error. ${ex.message}`);
     }
-  });
-};
 
-/**
-  Syntactic sugar for selectOne, selecting a single entity by its PK named 'id'.
-  @return promise for entity. If not found, the empty object {} will be returned.
-*/
-DbEntity.prototype.get = function(id, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' get...');
-    var entity = {};
+  }
 
-    self.fetchMetadata()
-    .then(function(){
+  /**
+    Syntactic sugar for selectOne, selecting a single entity by its PK named 'id'.
+    @return promise for entity. If not found, the empty object {} will be returned.
+  */
+  async get(id, opts){
+    
+    try{
+      debug(this.entity +' get...');
+      var entity = {};
+
+      await this.fetchMetadata()
+      
       var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
-      var sql = "SELECT "+whichcols+" FROM "+ self.table + " WHERE id = ?";
+      var sql = "SELECT "+whichcols+" FROM "+ this.table + " WHERE id = ?";
       debug('  query sql: ' + sql);
-      return self.callDb(sql, [id]);
-    })
-    .then(function(results){
-      debug(self.entity +' get result count: ' + results.length);
+      let results = await this.sqlCommand(sql, [id]);
+      
+      debug(this.entity +' get result count: ' + results.length);
       if(results.length>0){
         entity = results[0];
       }
-      resolve(entity);
-    })
-    .catch(function(err){
-      console.error(self.entity +' get error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
+      return entity;
+      
+    } catch (err){
+      console.error(`${this.entity} get error. Details: ${err.message}`);
+      throw err;
+    }
+  };
 
-/**
-  Similar to the get function, this function just returns a count (1 or 0) of whether the
-  entity exists or not, without retrieving the actual entity, again the PK is
-  assumed to be named 'id'.
-  @return promise for the count (1 or 0).
-*/
-DbEntity.prototype.exists = function(id){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' exists...');
-    var entity = {};
+  /**
+    Similar to the get function, this function just returns a count (1 or 0) of whether the
+    entity exists or not, without retrieving the actual entity, again the PK is
+    assumed to be named 'id'.
+    @return promise for the count (1 or 0).
+  */
+  async exists(id){
+    try {
+      debug(this.entity +' exists...');
+      await this.fetchMetadata()
 
-    self.fetchMetadata()
-    .then(function(){
-      var sql = "SELECT count(*) as count FROM "+ self.table + " WHERE id = ?";
+      var sql = "SELECT count(*) as count FROM "+ this.table + " WHERE id = ?";
       debug('  query sql: ' + sql);
-      return self.callDb(sql, [id]);
-    })
-    .then(function(results){
-      debug(self.entity +' exists result count: ' + results[0].count);
+      let results = await this.sqlCommand(sql, [id]);
+  
+      debug(this.entity +' exists result count: ' + results[0].count);
       resolve(results[0].count);
-    })
-    .catch(function(err){
-      console.error(self.entity +' exists error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
 
-/**
-  Select all (up to 1000) of a kind of entity.
-  @return promise for entity.
-  @param opts options to cover orderBy and limit options
-  @example
-  {
-    columns: ['column1', 'column2', 'column3'], //to be returned
-    orderBy: ['+column_name','-column_name'],
-    limit: 1000,
-    offset: 2500
+    } catch (err){
+      console.error(`${this.entity} exists error. Details: ${err.message}`);
+      throw err;
+    }
   }
-  @return Promise for an array of objects. If not found, the empty array [] will be returned.
-*/
-DbEntity.prototype.all = function(opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' all...');
-    var rs = [];
-    self.fetchMetadata()
-    .then(function(){
-      var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
-      var sql = "SELECT "+whichcols+" FROM "+ self.table + " ";
 
-      sql = self._appendOrderByAndLimit(sql, opts);
+
+  /**
+    Select all (up to 1000) of a kind of entity.
+    @return promise for entity.
+    @param opts options to cover orderBy and limit options
+    @example
+    {
+      columns: ['column1', 'column2', 'column3'], //to be returned
+      orderBy: ['+column_name','-column_name'],
+      limit: 1000,
+      offset: 2500
+    }
+    @return Promise for an array of objects. If not found, the empty array [] will be returned.
+  */
+  async all(opts){
+    try {
+      debug(this.entity +' all...');
+      var rs = [];
+      await this.fetchMetadata();
+     
+      var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
+      var sql = "SELECT "+whichcols+" FROM "+ this.table + " ";
+
+      sql = this._appendOrderByAndLimit(sql, opts);
 
       debug('  query sql: ' + sql);
 
-      return self.callDb(sql, []);
-    })
-    .then(function(results){
-      debug(self.entity +' all result count: ' + results.length);
-      rs = results;
-      resolve(rs);
-    })
-    .catch(function(err){
-      console.error(self.entity +' all error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
-
-/**
-  Performs a query for all rows matching the given template object.
-  @param {object} query (optional) 'template' object that is used to match the query.
-
-  All attributes provided on the query object (including those assigned a null
-  value) are assumed to be 'ANDed' together.
-
-  If you wish an 'OR' instead, add an opts.booleanMode : 'OR'
-  @param {object} opts (optional) query options
-  @example
-  {
-    columns: ['column1', 'column2', 'column3'], //to be returned
-    orderBy: ['+column_name','-column_name'],
-    limit: 1000,
-    offset: 2500,
-    booleanMode: 'OR'
+      return await this.sqlCommand(sql, []);
+     
+    } catch (err){
+      console.error(`${this.entity} all error. Details: ${err.message}`);
+      throw err;
+    }
   }
-*/
-DbEntity.prototype.find = function(query, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' find...');
 
-    self.fetchMetadata()
-    .then(function(){
+
+  /**
+    Performs a query for all rows matching the given template object.
+    @param {object} query (optional) 'template' object that is used to match the query.
+
+    All attributes provided on the query object (including those assigned a null
+    value) are assumed to be 'ANDed' together.
+
+    If you wish an 'OR' instead, add an opts.booleanMode : 'OR'
+    @param {object} opts (optional) query options
+    @example
+    {
+      columns: ['column1', 'column2', 'column3'], //to be returned
+      orderBy: ['+column_name','-column_name'],
+      limit: 1000,
+      offset: 2500,
+      booleanMode: 'OR'
+    }
+  */
+  async find(query, opts){
+    try{
+      debug(this.entity +' find...');
+
+      await this.fetchMetadata();
+  
       var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
-      var sql = "SELECT "+whichcols+" FROM "+ self.table + " ";
+      var sql = "SELECT "+whichcols+" FROM "+ this.table + " ";
       var parms = [];
       var bool = ' AND ';
       if(!_.isNil(opts) && !_.isNil(opts.booleanMode)){
@@ -284,48 +272,45 @@ DbEntity.prototype.find = function(query, opts){
         sql+=where;
       }
 
-      sql = self._appendOrderByAndLimit(sql, opts);
+      sql = this._appendOrderByAndLimit(sql, opts);
 
       debug('  query sql: ' + sql);
       debug('  query parms: ' + JSON.stringify(parms));
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      debug(self.entity +' find result count: ' + results.length);
-      resolve(results);
-    })
-    .catch(function(err){
-      console.error(self.entity +' find error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};//find
+      let results = await this.sqlCommand(sql, parms);
+      debug(this.entity +' find result count: ' + results.length);
+      return results;
+    
+    } catch (err){
+      console.error(`${this.entity} find error. Details: ${err.message}`);
+      throw err;
+    }
+  }//find
 
-/**
-  Similar to the find function. This function counts all rows matching the given
-  template object.
-  @param {object} query (optional) 'template' object that is used to match the query.
 
-  All attributes provided on the query object (including those assigned a null
-  value) are assumed to be 'ANDed' together.
+  /**
+    Similar to the find function. This function counts all rows matching the given
+    template object.
+    @param {object} query (optional) 'template' object that is used to match the query.
 
-  If you wish an 'OR' instead, add an opts.booleanMode : 'OR'
-  @param {object} opts (optional) query options
-  @example
-  {
-    limit: 1000,
-    offset: 2500,
-    booleanMode: 'OR'
-  }
-*/
-DbEntity.prototype.count = function(query, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' count...');
+    All attributes provided on the query object (including those assigned a null
+    value) are assumed to be 'ANDed' together.
 
-    self.fetchMetadata()
-    .then(function(){
-      var sql = "SELECT count(*) as count FROM "+ self.table + " ";
+    If you wish an 'OR' instead, add an opts.booleanMode : 'OR'
+    @param {object} opts (optional) query options
+    @example
+    {
+      limit: 1000,
+      offset: 2500,
+      booleanMode: 'OR'
+    }
+  */
+  async count(query, opts){
+    try {
+      debug(this.entity +' count...');
+
+      await this.fetchMetadata();
+
+      var sql = "SELECT count(*) as count FROM "+ this.table + " ";
       var parms = [];
       var bool = ' AND ';
       if(!_.isNil(opts) && !_.isNil(opts.booleanMode)){
@@ -344,168 +329,156 @@ DbEntity.prototype.count = function(query, opts){
         sql+=where;
       }
 
-      sql = self._appendOrderByAndLimit(sql, opts);
+      sql = this._appendOrderByAndLimit(sql, opts);
 
       debug('  query sql: ' + sql);
       debug('  query parms: ' + JSON.stringify(parms));
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      debug(self.entity +' count result count: ' + results[0].count);
-      resolve(results[0].count);
-    })
-    .catch(function(err){
-      console.error(self.entity +' count error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};//find
+      let results = await this.sqlCommand(sql, parms);
+    
+      debug(this.entity +' count result count: ' + results[0].count);
+      return results[0].count;
 
-/**
-  Same as the find function, except it returns one row or an empty object if
-  nothing is found.
-  @param opts {object} query options (not particularly relevant for this function, but available)
-  @example
-  {
-    columns: ['column1', 'column2', 'column3'], //to be returned
-    orderBy: ['+column_name','-column_name'],
-    limit: 1000,
-    offset: 2500,
-    booleanMode: 'OR'
-  }
-*/
-DbEntity.prototype.one = function(query, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' one...');
-    var entity = {};
-    return self.find(query,opts)
-    .then(function(result){
-     if(result.length>0){
-       entity = result[0];
-     }
-     resolve(entity);
-    })
-    .catch(function(err){
-     reject(err);
-    });
-  });
+    } catch (err){
+      console.error(`${this.entity} count error. Details: ${err.message}`);
+      throw err;
+    }
+  }//count
 
-};//one
 
-/**
-  Typically used for complex queries or reporting, this function performs a
-  sql query on the table backing the entity, selecting anything matching the given WHERE clause
-  (do not include the word 'WHERE') and parameters. To avoid SQL injection
-  risks, take care to only use this function when user input CANNOT
-  affect the WHERE clause being built. It is highly recommended to use
-  parameterized SQL.
-  @param where {string} parameterized where clause without the 'WHERE'
-  @param parms {array} individual data parameters for substitution into the WHERE clause
-  @param opts {object} query options (not particularly relevant for this function, but available)
-  @example
-  {
-    columns: ['column1', 'column2', 'column3'], //to be returned
-    orderBy: ['+column_name','-column_name'],
-    limit: 1000,
-    offset: 2500,
-    booleanMode: 'OR'
-  }
-*/
-DbEntity.prototype.selectWhere = function(where, parms, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' selectWhere...');
-    var rs = [];
-    self.fetchMetadata()
-    .then(function(){
+  /**
+    Same as the find function, except it returns one row or an empty object if
+    nothing is found.
+    @param opts {object} query options (not particularly relevant for this function, but available)
+    @example
+    {
+      columns: ['column1', 'column2', 'column3'], //to be returned
+      orderBy: ['+column_name','-column_name'],
+      limit: 1000,
+      offset: 2500,
+      booleanMode: 'OR'
+    }
+  */
+  async one(query, opts){
+    try {
+      debug(this.entity +' one...');
+      var entity = {};
+      let result = await this.find(query,opts)
+      if(result.length>0){
+        entity = result[0];
+      }
+      return entity;
+    } catch (err){
+      console.error(`${this.entity} one error. Details: ${err.message}`);
+      throw err;
+    }
+  } //one
+
+
+  /**
+    Typically used for complex queries or reporting, this function performs a
+    sql query on the table backing the entity, selecting anything matching the given WHERE clause
+    (do not include the word 'WHERE') and parameters. To avoid SQL injection
+    risks, take care to only use this function when user input CANNOT
+    affect the WHERE clause being built. It is highly recommended to use
+    parameterized SQL.
+    @param where {string} parameterized where clause without the 'WHERE'
+    @param parms {array} individual data parameters for substitution into the WHERE clause
+    @param opts {object} query options (not particularly relevant for this function, but available)
+    @example
+    {
+      columns: ['column1', 'column2', 'column3'], //to be returned
+      orderBy: ['+column_name','-column_name'],
+      limit: 1000,
+      offset: 2500,
+      booleanMode: 'OR'
+    }
+  */
+  async selectWhere(where, parms, opts){
+    try {
+      debug(this.entity +' selectWhere...');
+
+      await this.fetchMetadata();
+   
       var whichcols = opts && opts.columns ? opts.columns.join(',') : '*';
-      var sql = "SELECT "+whichcols+" FROM "+ self.table + " ";
+      var sql = "SELECT "+whichcols+" FROM "+ this.table + " ";
 
       if(where && where!==''){
         sql+=' WHERE ';
         sql+=where;
       }
 
-      sql = self._appendOrderByAndLimit(sql, opts);
+      sql = this._appendOrderByAndLimit(sql, opts);
 
       debug('  query sql: ' + sql);
       debug('  query parms: ' + JSON.stringify(parms));
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      debug(self.entity +' selectWhere result count: ' + results.length);
-      rs = results;
-      resolve(rs);
-    })
-    .catch(function(err){
-      console.error(self.entity +' selectWhere error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};//selectWhere
+      let results = await this.sqlCommand(sql, parms);
+    
+      debug(this.entity +' selectWhere result count: ' + results.length);
+      
+      return results;
+    } catch (err){
+      console.error(`${this.entity} selectWhere error. Details: ${err.message}`);
+      throw err;
+    }
+  } //selectWhere
 
-/**
-  Executes the given generic select statement.
-  @param select {string} parameterized select statement (omitting the ORDER BY, LIMIT, and OFFSET,
-  which should be provided in the opts parameter).
-  @param parms {array} individual data parameters for substitution into the statement
-  @param opts {object} query options (not particularly relevant for this function, but available)
-  @example
-  {
-    orderBy: ['+column_name','-column_name'],
-    limit: 1000,
-    offset: 2500,
-    booleanMode: 'OR'
-  }
-*/
-DbEntity.prototype.select = function(select, parms, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug(self.entity +' select...');
-    var rs = [];
-    self.fetchMetadata()
-    .then(function(){
+
+  /**
+    Executes the given generic select statement.
+    @param select {string} parameterized select statement (omitting the ORDER BY, LIMIT, and OFFSET,
+    which should be provided in the opts parameter).
+    @param parms {array} individual data parameters for substitution into the statement
+    @param opts {object} query options (not particularly relevant for this function, but available)
+    @example
+    {
+      orderBy: ['+column_name','-column_name'],
+      limit: 1000,
+      offset: 2500,
+      booleanMode: 'OR'
+    }
+  */
+  async select(select, parms, opts){
+    try {
+      debug(this.entity +' select...');
+      
+      await this.fetchMetadata();
+      
       var sql = select;
 
-      sql = self._appendOrderByAndLimit(sql, opts);
-
+      sql = this._appendOrderByAndLimit(sql, opts);
       debug('  query sql: ' + sql);
       debug('  query parms: ' + JSON.stringify(parms));
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      debug(self.entity +' select result count: ' + results.length);
-      rs = results;
-      resolve(rs);
-    })
-    .catch(function(err){
-      console.error(self.entity +' select error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};//select
+      let results = await this.sqlCommand(sql, parms);
+    
+      debug(this.entity +' select result count: ' + results.length);
+      return results;
+        
+    } catch (err){
+      console.error(`${this.entity} select error. Details: ${err.message}`);
+      throw err;
+    }
+  } //select
 
-/**
-  Creates a single entity.
-  @param save object to save. Only the properties provided on this object will
-  be included on the INSERT statement (if they match column names).
-  @return a promise bearing the save object. It will have its autogenerated key
-  field set if one was detected.
-*/
-DbEntity.prototype.create = function(save, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug( self.entity + ' create...' );
-    self.fetchMetadata()
-    .then(function(){
+  /**
+    Creates a single entity.
+    @param save object to save. Only the properties provided on this object will
+    be included on the INSERT statement (if they match column names).
+    @return a promise bearing the save object. It will have its autogenerated key
+    field set if one was detected.
+  */
+  async create(save, opts){
+    try {
+      debug( this.entity + ' create...' );
+      await this.fetchMetadata()
+
       var parms = [];
       var cols = '';
       var vals = '';
-      var not_ai_pks = _.filter(self.metadata,function(col){
+      var not_ai_pks = _.filter(this.metadata,function(col){
         return (col.pk===true && col.autoincrement===false )||(col.pk===false);
       });
 
+      let self = this;
       _.each(save, function(value, property_name){
         //Only props that match columns.
         var col = _.find(not_ai_pks, { column : property_name} );
@@ -516,60 +489,58 @@ DbEntity.prototype.create = function(save, opts){
 
           if(vals!=='') vals+=', ';
           vals+='?';
-          parms.push(_transformToSafeValue(value, col));
-
+          parms.push(self._transformToSafeValue(value, col));
         }
       });
-      var sql = "INSERT INTO " + self.table + " ("+ cols +") VALUES (" + vals + ");";
-
+      var sql = "INSERT INTO " + this.table + " ("+ cols +") VALUES (" + vals + ");";
 
       debug('  create sql: ' + sql);
       debug('  create parameters: ' + JSON.stringify(parms));
 
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
+      let results = await this.sqlCommand(sql, parms);
+
       verbose('  create raw results: ' + JSON.stringify(results));
       //Put the autogenerated id on the entity and return it.
       if(results.affectedRows > 0 && !_.isNil(results.insertId) && results.insertId > 0){
         //console.log('----- id ' + results.insertId)
-        var keyCol = _.find(self.metadata, {autoincrement: true, pk: true});
+        var keyCol = _.find(this.metadata, {autoincrement: true, pk: true});
         if(!_.isNil(keyCol)){
           save[keyCol.column] = results.insertId;
         }
         //console.log('----- keycol ' + JSON.stringify(keyCol));
 
       }
-      debug(self.entity +' create results:' + JSON.stringify(results));
-      resolve(save);
-    })
-    .catch(function(err){
-      console.error(self.entity +' create error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
+      debug(this.entity +' create results:' + JSON.stringify(results));
+      return save;
 
-/**
-  Updates a single row by id.
-  @param object to save. Only the attributes provided are updated (i.e. performs
-  a "sparse" update).
-  @return a promise bearing the save object. An _affectedRows attribute will
-  be added to this object. Any defaults in the database will
-  NOT be included in the returned object, and you should retrieve the object
-  again to update their values if you need them.
-*/
-DbEntity.prototype.update = function(save, opts){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug( self.entity + ' update...' );
+    } catch (err){
+      console.error(`${this.entity} create error. Details: ${err.message}`);
+      throw err;
+    }
+  } // create
 
-    self.fetchMetadata().then(function(){
+
+  /**
+    Updates a single row by id.
+    @param object to save. Only the attributes provided are updated (i.e. performs
+    a "sparse" update).
+    @return a promise bearing the save object. An _affectedRows attribute will
+    be added to this object. Any defaults in the database will
+    NOT be included in the returned object, and you should retrieve the object
+    again to update their values if you need them.
+  */
+  async update(save, opts){
+    try {
+      debug( this.entity + ' update...' );
+
+      await this.fetchMetadata();
+
       var parms = [];
-      var sql = "UPDATE " + self.table + " SET ";
-      var not_pks = _.filter(self.metadata,function(col){ return col.pk===false; });
+      var sql = "UPDATE " + this.table + " SET ";
+      var not_pks = _.filter(this.metadata,function(col){ return col.pk===false; });
       var sets = '';
 
+      let self = this;
       _.each(save, function(v,k){
         //Exists on not_pks?
         var col = _.find(not_pks, {column: k});
@@ -584,7 +555,7 @@ DbEntity.prototype.update = function(save, opts){
 
             sets+=col.column+'=?';
 
-            var parmVal = _transformToSafeValue(v, col);
+            var parmVal = self._transformToSafeValue(v, col);
             if(_.isNil(parmVal)){
               parmVal = null;
             }
@@ -600,17 +571,17 @@ DbEntity.prototype.update = function(save, opts){
 
       //additional versioning SET clause
       var versioning = '';
-      if(self.options.updated_timestamp_column){
-        versioning += ', ' + self.options.updated_timestamp_column + '=CURRENT_TIMESTAMP';
+      if(this.options.updated_timestamp_column){
+        versioning += ', ' + this.options.updated_timestamp_column + '=CURRENT_TIMESTAMP';
       }
-      if(self.options.version_number_column){
-        versioning += ', ' + self.options.version_number_column + '=' + self.options.version_number_column + '+1';
+      if(this.options.version_number_column){
+        versioning += ', ' + this.options.version_number_column + '=' + this.options.version_number_column + '+1';
       }
       sets+=versioning;
 
       sql+=sets;
 
-      var pks = _.filter(self.metadata,{ pk: true })
+      var pks = _.filter(this.metadata,{ pk: true })
       var where = '';
       _.each(pks, function(col){
         if(where!=='') where+=' AND ';
@@ -627,39 +598,35 @@ DbEntity.prototype.update = function(save, opts){
       debug('  update sql: ' + sql);
       debug('  update parameters: ' + JSON.stringify(parms));
 
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
+      let results =  await this.sqlCommand(sql, parms);
+
       save._affectedRows = results.affectedRows;
-      verbose(self.entity +' update raw results:' + JSON.stringify(results));
-      debug(self.entity +' update results:' + JSON.stringify(save));
-      resolve(save);
-    })
-    .catch(function(err){
-      console.error(self.entity +' update error. Details: ' + err.message);
-      reject(err);
-    });
+      verbose(this.entity +' update raw results:' + JSON.stringify(results));
+      debug(this.entity +' update results:' + JSON.stringify(save));
+      return save;
+  
+    } catch (err){
+      console.error(`${this.entity} update error. Details: ${err.message}`);
+      throw err;
+    }
+  } // update
 
-  });
-};
 
-/**
-  Upserts an entity. The save entity is examined for its primary keys and a lookup
-  is performed. If the lookup returns a result, an update is made. If the lookup
-  returns no results, a create is performed.
-  @param object to save. Note only the attributes provided are updated (i.e. performs
-  a "sparse" update).
-  @return a promise bearing the save results of either the update or create operation.
-  If a create was performed, any autogenerated id will be present.
-*/
-DbEntity.prototype.save = function(save, opts){
-  //Get pks.
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug( self.entity + ' update...' );
+  /**
+    Upserts an entity. The save entity is examined for its primary keys and a lookup
+    is performed. If the lookup returns a result, an update is made. If the lookup
+    returns no results, a create is performed.
+    @param object to save. Note only the attributes provided are updated (i.e. performs
+    a "sparse" update).
+    @return a promise bearing the save results of either the update or create operation.
+    If a create was performed, any autogenerated id will be present.
+  */
+  async save(save, opts){
+    try {
+      debug( this.entity + ' update...' );
 
-    self.fetchMetadata().then(function(){
-      var pks = _.filter(self.metadata,{ pk: true });
+      await this.fetchMetadata();
+      var pks = _.filter(this.metadata,{ pk: true });
       //Build PK query.
       var query = {};
       _.each(pks, function(col){
@@ -667,41 +634,38 @@ DbEntity.prototype.save = function(save, opts){
       });
 
       //Issue the query
-      return self.one(query);
-
-    })
-    .then(function(oneResult){
+      let oneResult = await this.one(query);
+    
       //Perform create or update based on results.
       if(_.isEmpty(oneResult)){
-        resolve(self.create(save, opts));
+        return this.create(save, opts);
       } else {
-        resolve(self.update(save, opts));
+        return this.update(save, opts);
       }
-    })
-    .catch(function(err){
-      console.error(self.entity +' save error. Details: ' + err.message);
-      reject(err);
-    });
-  });//promise
-};
 
-/**
-  Deletes a single entity by its primary key..
-  @param toDelete object whose attributes
-  @return a promise bearing the incoming object with an _affectedRows attribute added.
-*/
-DbEntity.prototype.deleteOne = function(toDelete){
-  var self = this;
-  return new Promise(function(resolve, reject){
+    } catch (err){
+      console.error(`${this.entity} save error. Details: ${err.message}`);
+      throw err;
+    }
+  } // save
 
-    debug( self.entity + ' delete...' );
 
-    self.fetchMetadata()
-    .then(function(){
+  /**
+    Deletes a single entity by its primary key..
+    @param toDelete object whose attributes
+    @return a promise bearing the incoming object with an _affectedRows attribute added.
+  */
+  async deleteOne(toDelete){
+    try {
+
+      debug( this.entity + ' delete...' );
+
+      await this.fetchMetadata();
+      
       var parms = [];
-      var sql = "DELETE FROM " + self.table;
+      var sql = "DELETE FROM " + this.table;
       sql+=' WHERE ';
-      var pks = _.filter(self.metadata,{ pk: true })
+      var pks = _.filter(this.metadata,{ pk: true })
       var where = '';
       _.each(pks, function(col){
         if(where!=='') where+=' AND ';
@@ -718,65 +682,61 @@ DbEntity.prototype.deleteOne = function(toDelete){
       debug('  deleteOne sql: ' + sql);
       debug('  deleteOne parameters: ' + JSON.stringify(parms));
 
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      verbose(self.entity +' deleteOne raw results:' + JSON.stringify(results));
+      let results = await this.sqlCommand(sql, parms);
+    
+      verbose(this.entity +' deleteOne raw results:' + JSON.stringify(results));
       toDelete._affectedRows = results.affectedRows;
-      debug(self.entity +' deleteOne results:' + JSON.stringify(toDelete));
-      resolve(toDelete);
-    })
-    .catch(function(err){
-      console.error(self.entity +' deleteOne error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
+      debug(this.entity +' deleteOne results:' + JSON.stringify(toDelete));
+      return toDelete;
 
-/**
-* Deletes a single entity by its PK named 'id'.
-* @return a promise bearing an object with an _affectedRows property.
-*/
-DbEntity.prototype.delete = function(id){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug( self.entity + ' delete...' );
-    var entity = {};
-    self.fetchMetadata().then(function(){
+    } catch (err){
+      console.error(`${this.entity} deleteOne error. Details: ${err.message}`);
+      throw err;
+    }
+  } // deleteOne
+
+
+  /**
+  * Deletes a single entity by its PK named 'id'.
+  * @return a promise bearing an object with an _affectedRows property.
+  */
+  async delete(id){
+    try {
+      debug( this.entity + ' delete...' );
+      var entity = {};
+      await this.fetchMetadata();
       var parms = [id];
-      var sql = "DELETE FROM " + self.table;
+      var sql = "DELETE FROM " + this.table;
       sql+=' WHERE id = ?';
 
       debug('  delete sql: ' + sql);
       debug('  delete parameters: ' + JSON.stringify(parms));
 
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      verbose(self.entity +' delete raw results:' + JSON.stringify(results));
+      let results = await this.sqlCommand(sql, parms);
+    
+      verbose(this.entity +' delete raw results:' + JSON.stringify(results));
       entity = {_affectedRows: results.affectedRows};
-      debug(self.entity +' delete results:' + JSON.stringify(entity));
-      resolve(entity);
-    })
-    .catch(function(err){
-      console.error(self.entity +' delete error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
+      debug(this.entity +' delete results:' + JSON.stringify(entity));
+      return entity;
+    
+    } catch (err){
+      console.error(`${this.entity} delete error. Details: ${err.message}`);
+      throw err;
+    }
+  } // delete (by id)
 
-/**
-  Deletes entities that match all the given attributes on the criteria object.
-  @param criteria object whose attributes specify the conditions for deletion.
-  @return a promise bearing the incoming object with an _affectedRows attribute added.
-*/
-DbEntity.prototype.deleteMatching = function(criteria){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug( self.entity + ' delete...' );
-    self.fetchMetadata().then(function(){
+
+  /**
+    Deletes entities that match all the given attributes on the criteria object.
+    @param criteria object whose attributes specify the conditions for deletion.
+    @return a promise bearing the incoming object with an _affectedRows attribute added.
+  */
+  async deleteMatching(criteria){
+    try {
+      debug( this.entity + ' delete...' );
+      await this.fetchMetadata();
       var parms = [];
-      var sql = "DELETE FROM " + self.table;
+      var sql = "DELETE FROM " + this.table;
       var bool = ' AND ';
       sql+=' WHERE ';
       var where = '';
@@ -791,38 +751,35 @@ DbEntity.prototype.deleteMatching = function(criteria){
       debug('  deleteMatching sql: ' + sql);
       debug('  deleteMatching parameters: ' + JSON.stringify(parms));
 
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      verbose(self.entity +' deleteMatching raw results:' + JSON.stringify(results));
+      let results = await this.sqlCommand(sql, parms);
+    
+      verbose(this.entity +' deleteMatching raw results:' + JSON.stringify(results));
       criteria._affectedRows = results.affectedRows;
-      debug(self.entity +' deleteMatching results:' + JSON.stringify(criteria));
-      resolve(criteria);
-    })
-    .catch(function(err){
-      console.error(self.entity +' deleteMatching error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
+      debug(this.entity +' deleteMatching results:' + JSON.stringify(criteria));
+      return criteria;
 
-/**
-  Deletes any entity matching the given WHERE clause (do not include the word 'WHERE')
-  and parameters. To avoid SQL injection risks, take care to only use this
-  function when user input CANNOT affect the WHERE clause being built. It is
-  highly recommended to use parameterized SQL.
-  @param where where clause without the 'WHERE'
-  @param parms parameters for the WHERE clause.
-  @return a promise bearing the a simple object with an _affectedRows attribute.
-*/
-DbEntity.prototype.deleteWhere = function(where, parms){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    debug( self.entity + ' deleteWhere...' );
-    var ret = {};
-    self.fetchMetadata()
-    .then(function(){
-      var sql = "DELETE FROM " + self.table;
+    } catch (err){
+      console.error(`${this.entity} deleteMatching error. Details: ${err.message}`);
+      throw err;
+    }
+  } // deleteMatching
+
+
+  /**
+    Deletes any entity matching the given WHERE clause (do not include the word 'WHERE')
+    and parameters. To avoid SQL injection risks, take care to only use this
+    function when user input CANNOT affect the WHERE clause being built. It is
+    highly recommended to use parameterized SQL.
+    @param where where clause without the 'WHERE'
+    @param parms parameters for the WHERE clause.
+    @return a promise bearing the a simple object with an _affectedRows attribute.
+  */
+  async deleteWhere(where, parms){
+    try {
+      debug( this.entity + ' deleteWhere...' );
+      var ret = {};
+      await this.fetchMetadata();
+      var sql = "DELETE FROM " + this.table;
       sql+=' WHERE ';
       if(_.isNil(where) || where===''){
         throw new Error('Could not delete. A WHERE clause must be provided.');
@@ -832,142 +789,136 @@ DbEntity.prototype.deleteWhere = function(where, parms){
       debug('  deleteWhere sql: ' + sql);
       debug('  deleteWhere parameters: ' + JSON.stringify(parms));
 
-      return self.callDb(sql, parms);
-    })
-    .then(function(results){
-      verbose(self.entity +' deleteWhere raw results:' + JSON.stringify(results));
+      let results = await this.sqlCommand(sql, parms);
+    
+      verbose(this.entity +' deleteWhere raw results:' + JSON.stringify(results));
       ret = { _affectedRows : results.affectedRows };
-      debug(self.entity +' deleteWhere results:' + JSON.stringify(ret));
+      debug(this.entity +' deleteWhere results:' + JSON.stringify(ret));
       resolve(ret);
-    })
-    .catch(function(err){
-      console.error(self.entity +' deleteWhere error. Details: ' + err.message);
-      reject(err);
-    });
-  });
-};
+    } catch (err){
+      console.error(`${this.entity} deleteWhere error. Details: ${err.message}`);
+      throw err;
+    }
+  } // deleteWhere 
 
-/**
-  Appends the ORDER BY and LIMIT options to a sql statement.
-  @param opts options to cover orderBy, limit, and offset options.
-  orderBy is an array of column names. Each column name should be immediately
-  preceded by + to indicate ascending order, or a - indicating descending order.
-  If orderBy is not given explicitly, the results will be returned in ASC order of
-  the primary key.
-  limit (optional) is the number of rows to be returned. If unspecified, the
-  resultset will be limited to 1000 rows.
-  offset (optional) is the number of rows to skip from the beginning of the potential
-  row resultset if otherwise unlimited. If offset is omitted, the results will
-  be taken from the beginning of the resultset.
-  @example
-  {
-    orderBy: ['+column_name','-column_name'],
-    limit: 1000,
-    offset: 2500
-  }
-*/
-DbEntity.prototype._appendOrderByAndLimit = function(sql, opts){
-  var self= this;
-  var orderBy = '';
-  var limit = '';
+  /**
+    (Synchronous) Appends the ORDER BY and LIMIT options to a sql statement.
+    @param opts options to cover orderBy, limit, and offset options.
+    orderBy is an array of column names. Each column name should be immediately
+    preceded by + to indicate ascending order, or a - indicating descending order.
+    If orderBy is not given explicitly, the results will be returned in ASC order of
+    the primary key.
+    limit (optional) is the number of rows to be returned. If unspecified, the
+    resultset will be limited to 1000 rows.
+    offset (optional) is the number of rows to skip from the beginning of the potential
+    row resultset if otherwise unlimited. If offset is omitted, the results will
+    be taken from the beginning of the resultset.
+    @example
+    {
+      orderBy: ['+column_name','-column_name'],
+      limit: 1000,
+      offset: 2500
+    }
+  */
+  _appendOrderByAndLimit(sql, opts){
+    var orderBy = '';
+    var limit = '';
 
-  if(!_.isNil(opts)){
-    if(!_.isNil(opts.orderBy) && opts.orderBy.length > 0){
-      orderBy+=' ORDER BY '
-      for(var i=0; i<opts.orderBy.length; i++){
-        if(i>0) orderBy+=', '
-        var colname = opts.orderBy[i];
-        var ord = 'ASC';
-        if (_.startsWith(colname, '-')){
-          colname = colname.substr(1);
-          ord = 'DESC';
-        } else if(_.startsWith(colname, '+')) {
-          colname = colname.substr(1);
+    if(!_.isNil(opts)){
+      if(!_.isNil(opts.orderBy) && opts.orderBy.length > 0){
+        orderBy+=' ORDER BY '
+        for(var i=0; i<opts.orderBy.length; i++){
+          if(i>0) orderBy+=', '
+          var colname = opts.orderBy[i];
+          var ord = 'ASC';
+          if (_.startsWith(colname, '-')){
+            colname = colname.substr(1);
+            ord = 'DESC';
+          } else if(_.startsWith(colname, '+')) {
+            colname = colname.substr(1);
+          }
+          orderBy+=colname + ' ' + ord;
         }
-        orderBy+=colname + ' ' + ord;
       }
-    }
-    if(!_.isNil(opts.limit)){
-      limit+=' LIMIT ' + opts.limit;
-    } else {
-      limit+=' LIMIT 1000'
-    }
-
-    if(!_.isNil(opts.offset)){
-      limit+=' OFFSET ' + opts.offset;
-    }
-  }
-  if(orderBy === ''){
-    var pks = _.filter(self.metadata, {pk: true});
-    if(pks.length > 0){
-      orderBy+=' ORDER BY ';
-      for(var i=0; i<pks.length; i++){
-        if(i>0) orderBy+=', '
-        orderBy+=pks[i].column + ' ASC';
-      }
-    }
-  }
-  sql+=orderBy;
-  sql+=limit;
-
-  return sql;
-}
-
-/**
-  Constructs an object for persistence by scraping the attributes from an object
-  which match the expected attributes on the data object, and disregarding all
-  attributes that are otherwise unexpected. This can be useful when
-  controllers are retrieving values from a web form or other source of
-  user-provided data.
-  @param obj {object} from which to derive the backing entity.
-*/
-DbEntity.prototype.from = function(obj){
-  var self = this;
-  return new Promise(function(resolve, reject){
-    self.fetchMetadata()
-    .then(function(metadata){
-      var x = {};
-      _.each( metadata, function(meta){
-        var v = obj[meta.column];
-        if(!_.isUndefined(v) && !_.isArray(v)){
-          //Note: explicit nulls will be set on the returned object.
-          x[meta.column] = v;
-        }
-      });
-      debug(self.entity +' from results:' + JSON.stringify(x));
-
-      return resolve(x);
-    })
-    .catch(function(err){
-      return reject(err);
-    });
-  });
-}
-
-/**
-  Helper that transforms input values to acceptable defaults for database columns.
-*/
-function _transformToSafeValue(input, column){
-  var out = input;
-  var datatype = column.sql_type;
-  var nullable = column.nullable;
-  if( input === '' ){
-    //empty string.
-    if(datatype==='datetime'|| datatype==='timestamp' ||_.startsWith(datatype, 'int') || _.startsWith(datatype, 'num') || _.startsWith(datatype, 'dec')){
-      if(nullable){
-        out = null;
+      if(!_.isNil(opts.limit)){
+        limit+=' LIMIT ' + opts.limit;
       } else {
-        throw new Error(column.column + ' is not permitted to be empty.')
+        limit+=' LIMIT 1000'
+      }
+
+      if(!_.isNil(opts.offset)){
+        limit+=' OFFSET ' + opts.offset;
       }
     }
-
-  } else if( !_.isNil(input) ) {
-    //not null, not undefined
-    if(datatype==='datetime'|| datatype==='timestamp'){
-      out = moment(input).format('YYYY-MM-DD HH:mm:ss');
+    if(orderBy === ''){
+      var pks = _.filter(this.metadata, {pk: true});
+      if(pks.length > 0){
+        orderBy+=' ORDER BY ';
+        for(var i=0; i<pks.length; i++){
+          if(i>0) orderBy+=', '
+          orderBy+=pks[i].column + ' ASC';
+        }
+      }
     }
-  }
-  return out;
-}
+    sql+=orderBy;
+    sql+=limit;
 
-module.exports=DbEntity;
+    return sql;
+  }
+
+  /**
+    Constructs an object for persistence by scraping the attributes from an object
+    which match the expected attributes on the data object, and disregarding all
+    attributes that are otherwise unexpected. This can be useful when
+    controllers are retrieving values from a web form or other source of
+    user-provided data.
+    @param obj {object} from which to derive the backing entity.
+  */
+  async from(obj){
+    await this.fetchMetadata();
+    var x = {};
+    this.metadata.forEach(meta => {
+      let v = obj[meta.column];
+      if(!_.isUndefined(v) && !_.isArray(v)){
+        //Note: explicit nulls will be set on the returned object.
+        x[meta.column] = v;
+      }
+    });
+    debug(this.entity +' from results:' + JSON.stringify(x));
+    return x;
+  }
+
+  /**
+    (Synchronous) Helper that transforms input values to acceptable defaults for database columns.
+  */
+  _transformToSafeValue(input, column){
+    var out = input;
+    var datatype = column.sql_type;
+    var nullable = column.nullable;
+    if( input === '' ){
+      //empty string.
+      if(datatype==='datetime'|| datatype==='timestamp' ||_.startsWith(datatype, 'int') || _.startsWith(datatype, 'num') || _.startsWith(datatype, 'dec')){
+        if(nullable){
+          out = null;
+        } else {
+          throw new Error(column.column + ' is not permitted to be empty.')
+        }
+      }
+
+    } else if( !_.isNil(input) ) {
+      //not null, not undefined
+      if(datatype==='datetime'|| datatype==='timestamp'){
+        out = moment(input).format('YYYY-MM-DD HH:mm:ss');
+      } else {
+        out = this.pool.escape(out);
+      }
+    }
+    return out;
+  }
+
+}//class
+
+/** @deprecated use Dao instead */
+exports.DbEntity = Dao;
+/** @returns {Dao} */
+exports.Dao = Dao;
