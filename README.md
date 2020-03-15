@@ -30,6 +30,9 @@ Work directly on any table in your mysql database using any of the following fun
 * __deleteMatching__ - deletes anything that matches the provided criteria
 * __deleteWhere__ - deletes anything that matches the provided WHERE clause
 
+## Generic
+* __sqlCommand__ - issues any kind of parameterized SQL command.
+
 # How to use it.
 
 ## Instantiate
@@ -39,7 +42,7 @@ __Important Prerequsite__: your app should configure a [mysql connection pool](h
 
 ```javascript
 //var pool = (assumed to be provided by your app)
-const DbEntity = require('@apigrate/mysqlutils');
+const {Dao} = require('@apigrate/mysqlutils');
 
 //An optional configuration object containing some options that you might want to use on a table.  
 
@@ -49,7 +52,7 @@ var opts = {
   version_number_column: 'version'
 };
 
-var Customer = new DbEntity('t_customer', 'customer', opts, pool);
+var Customer = new Dao('t_customer', 'customer', opts, pool);
 //Note, in addition to tables, you use this on views as well...
 ```
 
@@ -105,7 +108,7 @@ Customer.find({status: 'active', city: 'Chicago'})
 ### Support for Logging
 The [debug](https://www.npmjs.org/debug) library is used. Use `process.env.NODE_ENV='gr8:db'` for general debugging. For verbose logging (outputs raw responses on create, update, delete operations) use `gr8:db:verbose`.
 
-Note: as of version 3.0.0 logger injection is no longer supported and will be ignored.
+Note: as of version 3.x logger injection is no longer supported and will be ignored.
 #### What gets logged?
 1. error messages (database exceptions) are logged to `console.error`
 4. at `DEBUG='gr8:db'`, the following is logged:
