@@ -1,6 +1,6 @@
 {
   "name": "@apigrate/mysqlutils",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "An easy-to-use Promise-based MySQL ORM implementation.",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
     "debug": "^4.1.1",
     "lodash": "^4.17.15",
     "moment": "^2.24.0",
-    "mysql": "^2.17.1"
+    "mysql": "^2.18.1"
   },
   "peerDependencies": {
     "mysql": "^2.17.1"
