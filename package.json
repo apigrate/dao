@@ -1,6 +1,6 @@
 {
   "name": "@apigrate/mysqlutils",
-  "version": "4.1.2",
+  "version": "4.1.3",
   "description": "An easy-to-use Promise-based MySQL DAO implementation.",
   "main": "index.js",
   "scripts": {
