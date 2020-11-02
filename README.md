@@ -46,7 +46,7 @@ __Important Prerequsite__: your app should configure a [mysql connection pool](h
 
 ```javascript
 //var pool = (assumed to be provided by your app)
-const {Dao} = require('@apigrate/mysqlutils');
+const {Dao} = require('@apigrate/dao');
 
 //An optional configuration object containing some options that you might want to use on a table.  
 
