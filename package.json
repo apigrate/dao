@@ -1,7 +1,7 @@
 {
-  "name": "@apigrate/mysqlutils",
-  "version": "4.7.0",
-  "description": "An easy-to-use Promise-based MySQL DAO implementation.",
+  "name": "@apigrate/dao",
+  "version": "5.0.0",
+  "description": "A Promise-based DAO implementation, designed for mysql databases (fomerly @apigrate/mysqlutils).",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,7 +11,11 @@
     "url": "git+https://github.com/gaumeister/mysqlutils.git"
   },
   "keywords": [
-    "Mysql"
+    "database",
+    "data access",
+    "dao",
+    "db",
+    "mysql"
   ],
   "author": "Derek Gau",
   "license": "Apache-2.0",
@@ -20,11 +24,15 @@
   },
   "homepage": "https://github.com/gaumeister/mysqlutils#readme",
   "dependencies": {
-    "debug": "^4.1.1",
-    "lodash": "^4.17.19",
-    "moment": "^2.27.0"
+    "@fast-csv/format": "^4.3.3",
+    "debug": "^4.2.0",
+    "lodash": "^4.17.20",
+    "moment": "^2.29.1"
   },
   "peerDependencies": {
     "mysql": "^2.18.1"
+  },
+  "devDependencies": {
+    "dotenv": "^8.2.0"
   }
 }
