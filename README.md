@@ -1,8 +1,12 @@
-# mysqlutils
-A library that simplifies working with MySQL databases (it does carry a dependency on the [`mysql`](https://www.npmjs.com/package/mysql)) package. It provides promise-based functions making it easy to get objects out of database table rows with intuitive language.  
+# @apigrate/dao
+A library that simplifies working with relational database databases, using a Data Access Object (DAO) pattern.
+It provides promise-based functions making it easy to get objects out of database table rows with intuitive language.
 
 # What it does.
-Work directly on any table in your mysql database using any of the following functions, summarized as follows:
+Create a DAO for each table in your database. Once instantiated, you can use any of the available methods outlined below
+ to query, create, update, and delete rows from that table.
+> Note, this library is currently designed to work with mysql databases (note the peer dependency).
+> Support for additional databases may become available in the future.
 
 ## Single Row Queries
 
