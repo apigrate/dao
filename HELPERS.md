@@ -6,7 +6,7 @@ ExpressJS routers to assemble a query from parameters from a request.
 
 ### Usage
 ```javascript
-var CriteriaHelper = require('@apigrate/dao/helpers/criteria')
+var CriteriaHelper = require('@apigrate/dao/lib/criteria-helper')
 
 var criteria = new CriteriaHelper({ omitNull: true, omitEmpty: true });
 ```
