@@ -1,6 +1,6 @@
 {
   "name": "@apigrate/dao",
-  "version": "5.1.0",
+  "version": "5.1.1",
   "description": "A Promise-based DAO implementation, designed for mysql databases (fomerly @apigrate/mysqlutils).",
   "main": "index.js",
   "scripts": {
@@ -24,8 +24,8 @@
   },
   "homepage": "https://github.com/gaumeister/mysqlutils#readme",
   "dependencies": {
-    "@fast-csv/format": "^4.3.3",
-    "debug": "^4.2.0",
+    "@fast-csv/format": "^4.3.5",
+    "debug": "^4.3.1",
     "lodash": "^4.17.20",
     "moment": "^2.29.1"
   },
