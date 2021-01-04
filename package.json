@@ -1,6 +1,6 @@
 {
   "name": "@apigrate/dao",
-  "version": "5.1.1",
+  "version": "5.2.0",
   "description": "A Promise-based DAO implementation, designed for mysql databases (fomerly @apigrate/mysqlutils).",
   "main": "index.js",
   "scripts": {
