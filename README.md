@@ -63,51 +63,121 @@ var Customer = new Dao('t_customer', 'customer', opts, pool);
 ## Read/Query
 
 ### Get by id.
-Get a single table row by id and return it as an object.
+Get a single table row by id and return it as an object. Returns `null` when not found.
 ```javascript
-//Get a customer by id=27
-
-Customer.get(27)
-.then(function(cust){
-
-  //cust = {id: 27, name: 'John Smith', city: 'Chicago', active: true ... }
-
-})
-.catch(function(err){
-  console.error(err.message);
-});
-
+//Get a customer by id = 27
+let result = await Customer.get(27);
+//result --> {id: 27, name: 'John Smith', city: 'Chicago', active: true ... }
 ```
 
-### Find
+### Query
+
+#### Count
+
+Simplest form of query. Retrieves a count rows from DB matching the filter object.
+
 ```javascript
 //Search for customers where status='active' and city='Chicago'
-
-Customer.find({status: 'active', city: 'Chicago'})
-.then(function(customers){
-
-  //customers: an array of customer objects like,
-  // [ {id: 27, name: 'John Smith', city: 'Chicago' active: true ... }, {id: 28, name: 'Sally Woo', city: 'Chicago', active: true ... }, ...]
-
-})
-.catch(function(err){
-  console.error(err.message);
-});
-
+let result = await Customer.count({status: 'active', city: 'Chicago'})
+//result --> 2 
 ```
 
-*todo: more examples!*
+#### Filter
+
+Simple filter-matches-all query. Retrieves all rows from DB matching the filter object as an array. Returns an empty array when not found.
+
+```javascript
+//Search for customers where status='active' and city='Chicago'
+let result = await Customer.filter({status: 'active', city: 'Chicago'})
+//result --> [ {id: 27, name: 'John Smith', city: 'Chicago' active: true ... }, {id: 28, name: 'Sally Woo', city: 'Chicago', active: true ... }, ...]
+```
+
+#### One
+
+Identical to Filter, except only the first entity from results is returned as an object. Returns `null` when not found.
+
+```javascript
+//Search for customers where status='active' and city='Chicago'
+let result = await Customer.one({status: 'active', city: 'Chicago'})
+//result --> {id: 27, name: 'John Smith', city: 'Chicago' active: true ... }
+```
+
+### Advanced Query
+
+Select multiple entities matching a where clause and parameters.
+
+```javascript
+//Retrieve active customers in Chicago, Indianpolis.
+let result = await Customer.selectWhere("active=? AND (city=? or city=?)"  [true, "Chicago", "Indianapolis"]); 
+//result --> [ {id: 27, name: 'John Smith', city: 'Chicago' active: true ... }, {id: 28, name: 'Sally Woo', city: 'Chicago', active: true ... }, {id: 28, name: 'Jake Plumber', city: 'Indianapolis', active: true ... }, ...]
+```
 
 ## Create
-*todo: more examples!*
+
+Creates a new entity.
+
+```javascript
+//Create a new customer
+let customerToSave = { name: 'Acme, Inc.', city: 'Chicago', active: true}; 
+let result = await Customer.create(customerToSave); 
+//result --> {id: 27, name: 'Acme, Inc.', city: 'Chicago', active: true}; (assuming id is auto-generated)
+```
 
 ## Update
-*todo: more examples!*
+
+Updates an entity by primary key (which must be included on the payload).
+
+```javascript
+//Update an existing customer by id.
+let customerToSave = {id: 27, name: 'Acme, Inc.', city: 'Chicago', active: true};
+customerToSave.active = false;
+let result = await Customer.update(customerToSave); 
+//result --> {id: 27, name: 'Acme, Inc.', city: 'Chicago', active: false, _affectedRows: 1};
+```
 
 ## Delete
-*todo: more examples!*
 
-## More
+### Delete by ID
+
+Deletes an entity by primary key.
+
+```javascript
+//Delete customer id = 27
+let result = await Customer.delete(27); 
+//result --> {_affectedRows: 1, ...}
+```
+
+### Delete Matching
+
+Deletes multiple entities matching the filter object.
+
+```javascript
+//Delete inactive customers in Chicago
+let result = await Customer.deleteMatching({active: false, city: "Chicago"}); 
+//result --> {_affectedRows: 3, active: false, city: "Chicago"}
+```
+
+### Advanced Delete
+
+Deletes multiple entities matching a where clause and parameters.
+
+```javascript
+//Delete inactive customers in Chicago, Indianpolis.
+let result = await Customer.deleteWhere("active=? AND (city=? or city=?)"  [false, "Chicago", "Indianapolis"]); 
+//result --> {_affectedRows: 4}
+```
+
+## Generic SQL Support
+
+Use the `sqlCommand` method to issue any kind of parameterized SQL command (SELECT, INSERT, UPDATE, DELETE, etc.). The result
+returned is simply the result returned from the underlying [mysql](https://www.npmjs.com/package/mysql) library callback function.
+
+```javascript
+//Custom query example
+let result = await Customer.sqlCommand("SELECT id, name from my_customer_view where active=? AND (city=? or city=?)"  [false, "Chicago", "Indianapolis"]); 
+//result --> [{id: 27, name: "Acme, Inc."}, {id: 33, name: "American Finance Corporation"}, {id: 35, name: "Integrity Engineering"}]
+```
+
 
 ### Support for Logging
 The [debug](https://www.npmjs.org/debug) library is used. Use `process.env.NODE_ENV='gr8:db'` for general debugging. For verbose logging (outputs raw responses on create, update, delete operations) use `gr8:db:verbose`.
