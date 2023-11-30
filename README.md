@@ -2,6 +2,23 @@
 A library that simplifies working with relational database databases, using a Data Access Object (DAO) pattern.
 It provides promise-based functions making it easy to get objects out of database table rows with intuitive language.
 
+## v6 changes
+
+### breaking changes
+
+- Removed `lodash`, `@fast-csv/format`, `moment` dependencies.
+- Removed ExpressJS `db-api.js` helper library.
+
+### other changes
+
+- Removed unnecessary type casting for dates.
+- Introduce `query` method for better clarity. 
+- Deprecated `filter` method. Use `query` instead.
+- Remove unused `log_category` Dao option.
+
+
+
+
 # What it does.
 Create a DAO for each table in your database. Once instantiated, you can use any of the available methods outlined below
  to query, create, update, and delete rows from that table.
@@ -16,10 +33,10 @@ Create a DAO for each table in your database. Once instantiated, you can use any
 ## Multiple Row Queries
 
 * __all__ - selects all rows in a table (offset and limit are supported for paging)
-* __find__ - selects rows that meet criteria
-* __count__ - similar to __find__, but returns a count of the rows that match the criteria
+* __query__ - selects rows that meet criteria
+* __count__ - similar to __query__, but returns a count of the rows that match the criteria
 * __one__ - selects and returns only *one* of a list of rows that meet criteria
-* __selectWhere__ - same as __find__, but an explicit where clause is used as input.
+* __selectWhere__ - same as __query__, but an explicit where clause is used as input.
 * __select__ - supports a fully parameterized SQL select statement
 
 ## Insert and Update
@@ -74,7 +91,7 @@ let result = await Customer.get(27);
 
 #### Count
 
-Simplest form of query. Retrieves a count rows from DB matching the filter object.
+Simplest form of query. Retrieves a count rows from DB matching the query object.
 
 ```javascript
 //Search for customers where status='active' and city='Chicago'
@@ -82,19 +99,19 @@ let result = await Customer.count({status: 'active', city: 'Chicago'})
 //result --> 2 
 ```
 
-#### Filter
+#### Query
 
-Simple filter-matches-all query. Retrieves all rows from DB matching the filter object as an array. Returns an empty array when not found.
+Simple matches-all query. Retrieves all rows from DB matching the query object as an array. Returns an empty array when not found.
 
 ```javascript
 //Search for customers where status='active' and city='Chicago'
-let result = await Customer.filter({status: 'active', city: 'Chicago'})
+let result = await Customer.query({status: 'active', city: 'Chicago'})
 //result --> [ {id: 27, name: 'John Smith', city: 'Chicago' active: true ... }, {id: 28, name: 'Sally Woo', city: 'Chicago', active: true ... }, ...]
 ```
 
 #### One
 
-Identical to Filter, except only the first entity from results is returned as an object. Returns `null` when not found.
+Identical to query, except only the first entity from results is returned as an object. Returns `null` when not found.
 
 ```javascript
 //Search for customers where status='active' and city='Chicago'
@@ -149,7 +166,7 @@ let result = await Customer.delete(27);
 
 ### Delete Matching
 
-Deletes multiple entities matching the filter object.
+Deletes multiple entities matching the query object.
 
 ```javascript
 //Delete inactive customers in Chicago
