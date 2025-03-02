@@ -17,8 +17,6 @@ It provides promise-based functions making it easy to get objects out of databas
 - Remove unused `log_category` Dao option.
 
 
-
-
 # What it does.
 Create a DAO for each table in your database. Once instantiated, you can use any of the available methods outlined below
  to query, create, update, and delete rows from that table.
@@ -208,3 +206,8 @@ Note: as of version 3.x logger injection is no longer supported and will be igno
    * a count of the results (if any).
 5. at `DEBUG='gr8:db:verbose'`, the following is logged:
    * raw SQL command output from the underlying mysql library create, update, and delete statements.
+   * parameters used in queries
+#### Log Suppression
+There are two ways to suppress log output:
+1. Use the `DB_SUPPRESS_LOGGING_TABLES` environment to provide a comma-separated list of tables/views for which SQL/parameter logging output will be suppressed entirely.
+1. You can suppress logging on individual statements by using the option `{suppressLogging: true}` on the sqlCommand `opts` parameter
